@@ -1,0 +1,27 @@
+name: "Married + self-employed + PKV: no employer task, PKV task present"
+template_id: birth_de
+template_version: 1
+
+facts:
+  state: HH
+  birth_date: 2026-04-20
+  married: true
+  employment_type: self_employed
+  public_insurance: false
+  private_insurance: true
+  income_gap_ratio: 1.6
+
+expect:
+  tasks_present:
+    - t_add_child_insurance_pkv
+    - t_parental_allowance
+  tasks_absent:
+    - t_parental_leave_employer
+    - t_add_child_insurance_gkv
+    - t_paternity_acknowledgement
+  blocked_initially:
+    t_add_child_insurance_pkv: ["t_birth_certificate"]
+  deadlines:
+    t_add_child_insurance_pkv: 2026-05-20
+  recommendations_present:
+    - r_tax_class_switch_hint
