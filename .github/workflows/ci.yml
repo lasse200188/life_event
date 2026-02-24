@@ -37,6 +37,9 @@ jobs:
       - name: Run remaining backend tests
         run: python -m pytest -q -m "not workflow"
 
+      - name: Run blocked task policy tests (explicit)
+        run: python -m pytest -q app/tests/test_plans_api.py -k "blocked_task"
+
       - name: Lint (ruff)
         run: ruff check .
 

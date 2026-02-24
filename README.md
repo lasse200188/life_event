@@ -52,8 +52,9 @@ export CORS_ORIGINS='http://localhost:3000,http://127.0.0.1:3000'
   - Query: `status`, `include_metadata`
   - Returns stable order by `sort_key`
 - `PATCH /plans/{plan_id}/tasks/{task_id}`
-  - Input: `{ "status": "done|todo|..." }`
+  - Input: `{ "status": "done|todo|...", "force": false }`
   - Idempotent updates; `completed_at` handled consistently
+  - Blocked tasks require `force: true` (otherwise `409 TASK_BLOCKED`)
 
 ## Milestone 4: Minimal nutzbares Produkt (Frontend)
 
@@ -144,6 +145,12 @@ python -m pytest -q -m workflow
 ```bash
 cd backend
 python -m pytest -q -m "not workflow"
+```
+
+### Run blocked task policy tests (Milestone 4+)
+```bash
+cd backend
+python -m pytest -q app/tests/test_plans_api.py -k "blocked_task"
 ```
 
 ### Run full backend quality check (same order as CI)

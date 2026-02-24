@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -31,6 +32,7 @@ class TaskService:
         plan_id: UUID,
         task_id: UUID,
         status: TaskStatus,
+        force: bool = False,
     ) -> Task:
         task = session.get(Task, task_id)
         if task is None or task.plan_id != plan_id:
@@ -42,6 +44,19 @@ class TaskService:
 
         previous_status = task.status
         now = datetime.now(UTC)
+
+        if status == TaskStatus.done:
+            unresolved = self._read_unresolved_dependencies(session, task)
+            block_type = self._read_block_type(task.metadata_json)
+            if unresolved and block_type == "hard" and not force:
+                raise ApiError(
+                    status_code=409,
+                    code="TASK_BLOCKED",
+                    message=(
+                        f"Task '{task.task_key}' is blocked by unresolved dependencies: "
+                        + ", ".join(unresolved)
+                    ),
+                )
 
         task.status = status.value
         task.updated_at = now
@@ -56,3 +71,34 @@ class TaskService:
         session.commit()
         session.refresh(task)
         return task
+
+    def _read_unresolved_dependencies(self, session: Session, task: Task) -> list[str]:
+        metadata = task.metadata_json if isinstance(task.metadata_json, dict) else {}
+        raw_blocked_by = metadata.get("blocked_by", [])
+        if not isinstance(raw_blocked_by, list):
+            return []
+
+        blocked_by = [entry for entry in raw_blocked_by if isinstance(entry, str)]
+        if not blocked_by:
+            return []
+
+        stmt = select(Task.task_key, Task.status).where(
+            Task.plan_id == task.plan_id,
+            Task.task_key.in_(blocked_by),
+        )
+        dep_rows = list(session.execute(stmt).all())
+        dep_status_by_key = {task_key: status for task_key, status in dep_rows}
+
+        unresolved: list[str] = []
+        for dep_key in blocked_by:
+            if dep_status_by_key.get(dep_key) != TaskStatus.done.value:
+                unresolved.append(dep_key)
+        return unresolved
+
+    def _read_block_type(self, metadata: Any) -> str:
+        if not isinstance(metadata, dict):
+            return "hard"
+        block_type = metadata.get("block_type", "hard")
+        if block_type not in {"hard", "soft"}:
+            return "hard"
+        return block_type

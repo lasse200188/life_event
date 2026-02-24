@@ -67,6 +67,7 @@ class TaskResponse(BaseModel):
 
 class TaskStatusPatchRequest(BaseModel):
     status: TaskStatus = Field(...)
+    force: bool = Field(default=False)
 
 
 class ErrorEnvelope(BaseModel):

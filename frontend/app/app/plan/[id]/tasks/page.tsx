@@ -62,6 +62,11 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
 
   const sortedTasks = useMemo(() => sortTasksByDeadlinePriority(tasks), [tasks]);
 
+  function getUnresolvedDependencies(task: TaskResponse): string[] {
+    const blockedBy = dependencies[task.task_key] ?? task.metadata?.blocked_by ?? [];
+    return blockedBy.filter((dependency) => taskStatusByKey[dependency] !== "done");
+  }
+
   async function toggleDone(task: TaskResponse) {
     const nextStatus = task.status === "done" ? "todo" : "done";
     const previousTasks = tasks;
@@ -72,11 +77,40 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
     setInFlight((current) => ({ ...current, [task.id]: true }));
 
     try {
-      const updated = await patchTaskStatus(params.id, task.id, nextStatus);
+      const updated = await patchTaskStatus(params.id, task.id, nextStatus, false);
       setTasks((current) => current.map((item) => (item.id === task.id ? updated : item)));
     } catch {
       setTasks(previousTasks);
       setError("Task-Update fehlgeschlagen. Bitte erneut versuchen.");
+    } finally {
+      setInFlight((current) => ({ ...current, [task.id]: false }));
+    }
+  }
+
+  async function forceComplete(task: TaskResponse) {
+    const confirmed = window.confirm(
+      "Diese Aufgabe ist noch blockiert. Trotzdem als erledigt markieren?",
+    );
+    if (!confirmed) {
+      return;
+    }
+
+    const previousTasks = tasks;
+    setTasks((current) =>
+      current.map((item) => (item.id === task.id ? { ...item, status: "done" } : item)),
+    );
+    setInFlight((current) => ({ ...current, [task.id]: true }));
+
+    try {
+      const updated = await patchTaskStatus(params.id, task.id, "done", true);
+      setTasks((current) => current.map((item) => (item.id === task.id ? updated : item)));
+    } catch (updateError) {
+      setTasks(previousTasks);
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Task-Update fehlgeschlagen. Bitte erneut versuchen.",
+      );
     } finally {
       setInFlight((current) => ({ ...current, [task.id]: false }));
     }
@@ -111,8 +145,7 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
 
       <section style={{ display: "grid", gap: "0.65rem" }}>
         {sortedTasks.map((task) => {
-          const blockedBy = dependencies[task.task_key] ?? task.metadata?.blocked_by ?? [];
-          const unresolved = blockedBy.filter((dependency) => taskStatusByKey[dependency] !== "done");
+          const unresolved = getUnresolvedDependencies(task);
           const isBlocked = task.status !== "done" && unresolved.length > 0;
 
           return (
@@ -120,7 +153,7 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
               <div style={{ display: "flex", alignItems: "flex-start", gap: "0.65rem" }}>
                 <input
                   checked={task.status === "done"}
-                  disabled={Boolean(inFlight[task.id])}
+                  disabled={Boolean(inFlight[task.id]) || isBlocked}
                   onChange={() => void toggleDone(task)}
                   type="checkbox"
                   style={{ marginTop: "0.35rem" }}
@@ -141,6 +174,18 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
                 {isBlocked ? <span className="badge badge-warning">Blockiert</span> : null}
                 {isBlocked ? <span className="badge">blocked_by: {unresolved.join(", ")}</span> : null}
               </div>
+              {isBlocked ? (
+                <div>
+                  <button
+                    className="button button-ghost"
+                    disabled={Boolean(inFlight[task.id])}
+                    onClick={() => void forceComplete(task)}
+                    type="button"
+                  >
+                    Trotzdem als erledigt markieren
+                  </button>
+                </div>
+              ) : null}
             </article>
           );
         })}

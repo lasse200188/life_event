@@ -114,3 +114,64 @@ def test_patch_task_not_in_plan_returns_404(client: TestClient) -> None:
     )
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "TASK_NOT_FOUND"
+
+
+def test_cannot_complete_blocked_task_without_force(client: TestClient) -> None:
+    create_payload = {
+        "template_key": "birth_de/v1",
+        "facts": {
+            "birth_date": "2026-04-01",
+            "employment_type": "employed",
+            "public_insurance": True,
+            "private_insurance": False,
+        },
+    }
+    plan_id = client.post("/plans", json=create_payload).json()["id"]
+
+    tasks_response = client.get(f"/plans/{plan_id}/tasks?include_metadata=true")
+    assert tasks_response.status_code == 200
+    blocked_task = next(
+        item
+        for item in tasks_response.json()
+        if item.get("metadata", {}).get("blocked_by")
+    )
+
+    response = client.patch(
+        f"/plans/{plan_id}/tasks/{blocked_task['id']}",
+        json={"status": "done"},
+    )
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "TASK_BLOCKED"
+
+
+def test_can_force_complete_blocked_task(client: TestClient) -> None:
+    create_payload = {
+        "template_key": "birth_de/v1",
+        "facts": {
+            "birth_date": "2026-04-01",
+            "employment_type": "employed",
+            "public_insurance": True,
+            "private_insurance": False,
+        },
+    }
+    plan_id = client.post("/plans", json=create_payload).json()["id"]
+
+    tasks_response = client.get(f"/plans/{plan_id}/tasks?include_metadata=true")
+    assert tasks_response.status_code == 200
+    blocked_task = next(
+        item
+        for item in tasks_response.json()
+        if item.get("metadata", {}).get("blocked_by")
+    )
+
+    response = client.patch(
+        f"/plans/{plan_id}/tasks/{blocked_task['id']}",
+        json={"status": "done", "force": True},
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "done"
+    assert body["completed_at"] is not None

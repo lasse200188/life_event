@@ -104,6 +104,7 @@ def update_task_status(
         plan_id=plan_id,
         task_id=task_id,
         status=payload.status,
+        force=payload.force,
     )
     return _serialize_task(task, include_metadata=True)
 

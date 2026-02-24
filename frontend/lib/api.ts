@@ -129,9 +129,10 @@ export async function patchTaskStatus(
   planId: string,
   taskId: string,
   status: TaskStatus,
+  force = false,
 ): Promise<TaskResponse> {
   return apiRequest<TaskResponse>(`/plans/${planId}/tasks/${taskId}`, {
     method: "PATCH",
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, force }),
   });
 }

@@ -110,6 +110,7 @@ class PlanService:
                             if isinstance(item.get("depends_on"), list)
                             else []
                         ),
+                        "block_type": "hard",
                     }
 
                     task = Task(
