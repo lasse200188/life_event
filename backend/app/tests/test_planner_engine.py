@@ -49,6 +49,7 @@ def test_generate_plan_soft_prunes_inactive_dependencies_and_is_deterministic() 
 
     assert plan1 == plan2
     assert json.dumps(plan1, sort_keys=True) == json.dumps(plan2, sort_keys=True)
+    # Stable order comes from heap-based topological queue (ID tie-break on ready set).
     assert plan1["tasks"] == [
         {
             "id": "t_a",

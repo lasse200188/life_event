@@ -34,6 +34,21 @@ def test_eval_rule_unknown_field_is_false_for_equality() -> None:
     assert eval_rule(rule, {}) is False
 
 
+def test_eval_rule_unknown_field_is_false_for_not_equal() -> None:
+    rule = {"fact": "country", "op": "!=", "value": "DE"}
+    assert eval_rule(rule, {}) is False
+
+
+def test_eval_rule_unknown_field_is_false_for_membership() -> None:
+    rule = {"fact": "employment", "op": "in", "value": ["employed", "student"]}
+    assert eval_rule(rule, {}) is False
+
+
+def test_eval_rule_unknown_field_is_false_for_numeric_compare() -> None:
+    rule = {"fact": "income", "op": ">", "value": 1000}
+    assert eval_rule(rule, {}) is False
+
+
 def test_explicit_null_eligibility_raises() -> None:
     task = {"eligibility": None}
     with pytest.raises(PlannerRuleError, match="cannot be null"):

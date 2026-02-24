@@ -40,6 +40,9 @@ def eval_predicate(pred: dict[str, Any], facts: dict[str, Any]) -> bool:
     if not isinstance(fact_key, str) or not isinstance(op, str):
         raise PlannerRuleError(f"invalid predicate shape: {pred!r}")
 
+    if op != "exists" and fact_key not in facts:
+        return False
+
     left = facts.get(fact_key)
     right = pred.get("value")
 

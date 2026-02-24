@@ -59,6 +59,16 @@ ruff check .
 black --check .
 ```
 
+## Planner engine semantics (Milestone 2)
+
+- `generate_plan(workflow, user_input)` is pure logic (no DB/IO/side effects).
+- Dependency source of truth is `workflow.graph.edges` (not task-local `depends_on` fields).
+- Unknown dependency IDs in `graph.edges` are hard errors.
+- Dependencies to inactive tasks are soft-pruned from output.
+- Rule evaluation behavior for missing facts:
+  - `exists`: checks key presence.
+  - all other operators (`=`, `!=`, `in`, `>`, `>=`, `<`, `<=`): evaluate to `False` when the fact is missing.
+
 ## Current CI pipeline
 
 `backend-tests` runs:

@@ -344,6 +344,11 @@ Neue Version erzeugen:
 4) generate_plan() Output definieren
 5) Tests laufen lassen (Regression)
 
+**Spec-Details (verbindlich)**
+- Source of truth fuer Dependencies ist `graph.edges`.
+- Unknown Dependency IDs sind Fehler; Dependencies auf inaktive Tasks werden gepruned.
+- Fehlende Facts liefern bei allen Vergleichsoperatoren `False` (Ausnahme: `exists` prueft nur Key-Praesenz).
+
 **DoD**
 - `generate_plan()` deterministisch
 - Testcases decken Varianten ab
