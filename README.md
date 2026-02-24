@@ -18,6 +18,8 @@ cd backend
 pip install -e .[dev]
 # optional: Postgres statt SQLite nutzen
 export DATABASE_URL='postgresql+psycopg://life_event:life_event@localhost:5432/life_event'
+# optional: bei Postgres auto create_all erzwingen (default: nur bei SQLite)
+export AUTO_CREATE_SCHEMA=1
 uvicorn app.main:app --reload
 ```
 
@@ -61,6 +63,7 @@ Error code convention:
 - `PLAN_NOT_FOUND`
 - `TASK_NOT_FOUND`
 - `PLANNER_INPUT_INVALID`
+- `PERSISTENCE_ERROR`
 
 Status code convention:
 - `422`: request schema/enum/type validation

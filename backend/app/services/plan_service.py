@@ -4,6 +4,7 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.db.models import Plan, PlanStatus, Task, TaskStatus
@@ -68,13 +69,31 @@ class PlanService:
                 session.flush()
 
                 for idx, item in enumerate(planner_plan["tasks"]):
+                    raw_deadline = item.get("deadline")
+                    due_date = None
+                    if raw_deadline is not None:
+                        if not isinstance(raw_deadline, str):
+                            raise ApiError(
+                                status_code=400,
+                                code="PLANNER_INPUT_INVALID",
+                                message="Task deadline must be an ISO date string",
+                            )
+                        try:
+                            due_date = datetime.fromisoformat(raw_deadline).date()
+                        except ValueError as exc:
+                            raise ApiError(
+                                status_code=400,
+                                code="PLANNER_INPUT_INVALID",
+                                message="Task deadline must be an ISO date string",
+                            ) from exc
+
                     task = Task(
                         plan_id=plan.id,
                         task_key=item["id"],
                         title=item["title"],
                         description=None,
                         status=TaskStatus.todo.value,
-                        due_date=datetime.fromisoformat(item["deadline"]).date(),
+                        due_date=due_date,
                         metadata_json=item.get("meta") or {},
                         sort_key=idx,
                     )
@@ -84,11 +103,11 @@ class PlanService:
             return plan
         except ApiError:
             raise
-        except Exception as exc:
+        except SQLAlchemyError as exc:
             session.rollback()
             raise ApiError(
-                status_code=400,
-                code="PLANNER_INPUT_INVALID",
+                status_code=500,
+                code="PERSISTENCE_ERROR",
                 message="Could not persist generated plan",
             ) from exc
 

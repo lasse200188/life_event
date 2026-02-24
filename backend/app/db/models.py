@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import uuid
 from datetime import date, datetime
 from enum import Enum
@@ -38,6 +39,11 @@ class TaskStatus(str, Enum):
 
 
 JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
+JSON_EMPTY_DEFAULT = (
+    text("'{}'::jsonb")
+    if os.getenv("DATABASE_URL", "").startswith("postgresql")
+    else text("'{}'")
+)
 
 
 class Plan(Base):
@@ -79,7 +85,7 @@ class Task(Base):
         "metadata",
         JSON_TYPE,
         nullable=False,
-        server_default=text("'{}'"),
+        server_default=JSON_EMPTY_DEFAULT,
     )
     sort_key: Mapped[int] = mapped_column(Integer, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(

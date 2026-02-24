@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
@@ -37,7 +39,13 @@ def create_app() -> FastAPI:
 
     @app.on_event("startup")
     def init_schema() -> None:
-        Base.metadata.create_all(bind=get_engine())
+        database_url = os.getenv("DATABASE_URL", "sqlite:///./life_event.db")
+        auto_create_schema = os.getenv("AUTO_CREATE_SCHEMA")
+        should_create = auto_create_schema == "1" or (
+            auto_create_schema is None and database_url.startswith("sqlite")
+        )
+        if should_create:
+            Base.metadata.create_all(bind=get_engine())
 
     @app.get("/health", tags=["system"])
     def health() -> dict[str, str]:
