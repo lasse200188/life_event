@@ -8,6 +8,7 @@ from typing import Any
 
 import yaml
 
+from app.planner.rules import eval_rule
 from app.domain.workflow_validator import validate_graph
 
 
@@ -85,65 +86,6 @@ def run_template(template: dict[str, Any], facts: dict[str, Any]) -> RuntimeResu
         deadlines=deadlines,
         active_recommendations=active_recommendations,
     )
-
-
-def eval_rule(rule: Any, facts: dict[str, Any]) -> bool:
-    if rule is None:
-        return True
-    if not isinstance(rule, dict):
-        raise ValueError("rule must be an object")
-
-    if "all" in rule:
-        clauses = rule["all"]
-        if not isinstance(clauses, list):
-            raise ValueError("rule.all must be a list")
-        return all(eval_rule(clause, facts) for clause in clauses)
-
-    if "any" in rule:
-        clauses = rule["any"]
-        if not isinstance(clauses, list):
-            raise ValueError("rule.any must be a list")
-        return any(eval_rule(clause, facts) for clause in clauses)
-
-    if "not" in rule:
-        return not eval_rule(rule["not"], facts)
-
-    return eval_predicate(rule, facts)
-
-
-def eval_predicate(pred: dict[str, Any], facts: dict[str, Any]) -> bool:
-    fact_key = pred.get("fact")
-    op = pred.get("op")
-    if not isinstance(fact_key, str) or not isinstance(op, str):
-        raise ValueError(f"invalid predicate shape: {pred!r}")
-
-    left = facts.get(fact_key)
-    right = pred.get("value")
-
-    if op == "exists":
-        return fact_key in facts
-    if op == "=":
-        return left == right
-    if op == "!=":
-        return left != right
-    if op == "in":
-        return left in right if isinstance(right, list) else False
-    if op == ">":
-        return _compare_numeric(left, right, lambda a, b: a > b)
-    if op == ">=":
-        return _compare_numeric(left, right, lambda a, b: a >= b)
-    if op == "<":
-        return _compare_numeric(left, right, lambda a, b: a < b)
-    if op == "<=":
-        return _compare_numeric(left, right, lambda a, b: a <= b)
-
-    raise ValueError(f"unsupported predicate op: {op}")
-
-
-def _compare_numeric(left: Any, right: Any, fn: Any) -> bool:
-    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
-        return bool(fn(left, right))
-    return False
 
 
 def compute_deadline(deadline: dict[str, Any], facts: dict[str, Any]) -> str | None:

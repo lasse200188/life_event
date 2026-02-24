@@ -4,7 +4,7 @@ template_version: 1
 
 facts:
   state: SN
-  birth_date: 2026-06-01
+  birth_date: "2026-06-01"
   married: false
   employment_type: unemployed
   public_insurance: true
@@ -25,3 +25,38 @@ expect:
     - r_tax_class_switch_hint
   recommendations_present:
     - r_elterngeld_split_hint
+
+expected_plan:
+  workflow_id: birth_de
+  event_date: "2026-06-01"
+  tasks:
+    - id: t_birth_certificate
+      title: Geburtsurkunde beantragen
+      relative_days: 7
+      deadline: "2026-06-08"
+      depends_on: []
+      meta: {}
+    - id: t_add_child_insurance_gkv
+      title: Kind bei gesetzlicher Krankenkasse mitversichern
+      relative_days: 30
+      deadline: "2026-07-01"
+      depends_on: [t_birth_certificate]
+      meta: {}
+    - id: t_child_benefit
+      title: Kindergeld beantragen
+      relative_days: 90
+      deadline: "2026-08-30"
+      depends_on: [t_birth_certificate]
+      meta: {}
+    - id: t_parental_allowance
+      title: Elterngeld beantragen
+      relative_days: 90
+      deadline: "2026-08-30"
+      depends_on: [t_birth_certificate]
+      meta: {}
+    - id: t_paternity_acknowledgement
+      title: Vaterschaftsanerkennung (falls nötig) klären
+      relative_days: 30
+      deadline: "2026-07-01"
+      depends_on: []
+      meta: {}

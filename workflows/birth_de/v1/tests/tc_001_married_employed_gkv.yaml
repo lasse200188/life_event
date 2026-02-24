@@ -4,7 +4,7 @@ template_version: 1
 
 facts:
   state: BY
-  birth_date: 2026-03-12
+  birth_date: "2026-03-12"
   married: true
   employment_type: employed
   public_insurance: true
@@ -32,3 +32,38 @@ expect:
   recommendations_present:
     - r_tax_class_switch_hint
     - r_elterngeld_split_hint
+
+expected_plan:
+  workflow_id: birth_de
+  event_date: "2026-03-12"
+  tasks:
+    - id: t_birth_certificate
+      title: Geburtsurkunde beantragen
+      relative_days: 7
+      deadline: "2026-03-19"
+      depends_on: []
+      meta: {}
+    - id: t_add_child_insurance_gkv
+      title: Kind bei gesetzlicher Krankenkasse mitversichern
+      relative_days: 30
+      deadline: "2026-04-11"
+      depends_on: [t_birth_certificate]
+      meta: {}
+    - id: t_child_benefit
+      title: Kindergeld beantragen
+      relative_days: 90
+      deadline: "2026-06-10"
+      depends_on: [t_birth_certificate]
+      meta: {}
+    - id: t_parental_allowance
+      title: Elterngeld beantragen
+      relative_days: 90
+      deadline: "2026-06-10"
+      depends_on: [t_birth_certificate]
+      meta: {}
+    - id: t_parental_leave_employer
+      title: Elternzeit beim Arbeitgeber anmelden
+      relative_days: 7
+      deadline: "2026-03-19"
+      depends_on: []
+      meta: {}

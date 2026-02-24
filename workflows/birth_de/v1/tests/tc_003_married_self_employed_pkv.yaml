@@ -4,7 +4,7 @@ template_version: 1
 
 facts:
   state: HH
-  birth_date: 2026-04-20
+  birth_date: "2026-04-20"
   married: true
   employment_type: self_employed
   public_insurance: false
@@ -25,3 +25,32 @@ expect:
     t_add_child_insurance_pkv: 2026-05-20
   recommendations_present:
     - r_tax_class_switch_hint
+
+expected_plan:
+  workflow_id: birth_de
+  event_date: "2026-04-20"
+  tasks:
+    - id: t_birth_certificate
+      title: Geburtsurkunde beantragen
+      relative_days: 7
+      deadline: "2026-04-27"
+      depends_on: []
+      meta: {}
+    - id: t_add_child_insurance_pkv
+      title: Kind privat krankenversichern
+      relative_days: 30
+      deadline: "2026-05-20"
+      depends_on: [t_birth_certificate]
+      meta: {}
+    - id: t_child_benefit
+      title: Kindergeld beantragen
+      relative_days: 90
+      deadline: "2026-07-19"
+      depends_on: [t_birth_certificate]
+      meta: {}
+    - id: t_parental_allowance
+      title: Elterngeld beantragen
+      relative_days: 90
+      deadline: "2026-07-19"
+      depends_on: [t_birth_certificate]
+      meta: {}
