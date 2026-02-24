@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from domain.workflow_validator import validate_graph
+from app.domain.workflow_validator import validate_graph
 
 
 @dataclass(frozen=True)

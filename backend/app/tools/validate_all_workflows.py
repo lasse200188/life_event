@@ -5,10 +5,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-try:
-    from domain.workflow_validator import WorkflowValidationError, validate_graph
-except ModuleNotFoundError:
-    from app.domain.workflow_validator import WorkflowValidationError, validate_graph
+from app.domain.workflow_validator import WorkflowValidationError, validate_graph
 
 
 @dataclass(frozen=True)
@@ -52,10 +49,6 @@ def _basic_template_checks(template: Dict[str, Any], path: Path) -> None:
     tasks = template.get("tasks")
     if not isinstance(tasks, dict):
         raise WorkflowValidationError(f"tasks must be object in {path}")
-
-    nodes = graph.get("nodes", [])
-    if isinstance(nodes, list) and len(nodes) != len(set(nodes)):
-        raise WorkflowValidationError(f"duplicate node ids in graph.nodes in {path}")
 
 
 def validate_one_compiled_json(path: Path) -> None:

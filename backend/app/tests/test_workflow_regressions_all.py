@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from domain.workflow_test_runner import load_template, load_testcase, run_template
+from app.domain.workflow_test_runner import load_template, load_testcase, run_template
 
 pytestmark = pytest.mark.workflow
 

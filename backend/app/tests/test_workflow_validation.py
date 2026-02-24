@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from domain.workflow_validator import WorkflowValidationError, validate_graph
+from app.domain.workflow_validator import WorkflowValidationError, validate_graph
 
 pytestmark = pytest.mark.workflow
 
