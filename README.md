@@ -1,6 +1,6 @@
 # life-event
 
-Monorepo skeleton for the Life Event workflow platform.
+Monorepo for the Life Event workflow platform.
 
 ## Quickstart
 
@@ -16,6 +16,8 @@ POSTGRES_PORT=5433 REDIS_PORT=6380 docker compose up -d
 ```bash
 cd backend
 pip install -e .[dev]
+# optional: Postgres statt SQLite nutzen
+export DATABASE_URL='postgresql+psycopg://life_event:life_event@localhost:5432/life_event'
 uvicorn app.main:app --reload
 ```
 
@@ -27,11 +29,63 @@ npm run dev
 npm run build
 ```
 
-## Workflow quality gates (Milestone 1)
+## Milestone 3: Persisted Plans + Tasks API
+
+### Endpoints
+- `POST /plans`
+  - Input: `template_key`, `facts`
+  - Output: `201` with `id`, `links`, timestamps
+- `GET /plans/{id}`
+  - Query: `include_snapshot` (default `false`)
+  - Returns plan shell + `snapshot_meta`, optional full `snapshot`
+- `GET /plans/{id}/tasks`
+  - Query: `status`, `include_metadata`
+  - Returns stable order by `sort_key`
+- `PATCH /plans/{plan_id}/tasks/{task_id}`
+  - Input: `{ "status": "done|todo|..." }`
+  - Idempotent updates; `completed_at` handled consistently
+
+### Error model
+All domain errors use:
+```json
+{
+  "error": {
+    "code": "...",
+    "message": "..."
+  }
+}
+```
+
+Error code convention:
+- `TEMPLATE_NOT_FOUND`
+- `PLAN_NOT_FOUND`
+- `TASK_NOT_FOUND`
+- `PLANNER_INPUT_INVALID`
+
+Status code convention:
+- `422`: request schema/enum/type validation
+- `404`: missing template/plan/task
+- `400`: planner cannot process otherwise valid input
+
+### Data model (persisted)
+- `plans`: `template_key`, `facts`, `snapshot`, `status`, timestamps
+- `tasks`: `plan_id`, `task_key`, `status`, `due_date`, `metadata`, `sort_key`, timestamps
+
+## Database migrations (Alembic)
+
+```bash
+cd backend
+# uses DATABASE_URL if set; otherwise alembic.ini default
+alembic upgrade head
+alembic downgrade -1
+```
+
+Initial migration is in:
+- `backend/alembic/versions/20260224_01_init_plans_tasks.py`
+
+## Workflow quality gates (Milestone 1+2)
 
 ### Validate all workflow templates
-This validates all `workflows/**/compiled.json` files for JSON + graph semantics.
-
 ```bash
 cd backend
 python -m app.tools.validate_all_workflows ../workflows
@@ -62,32 +116,20 @@ black --check .
 ## Planner engine semantics (Milestone 2)
 
 - `generate_plan(workflow, user_input)` is pure logic (no DB/IO/side effects).
-- Dependency source of truth is `workflow.graph.edges` (not task-local `depends_on` fields).
+- Dependency source of truth is `workflow.graph.edges`.
 - Unknown dependency IDs in `graph.edges` are hard errors.
 - Dependencies to inactive tasks are soft-pruned from output.
-- Rule evaluation behavior for missing facts:
+- Missing fact handling in rules:
   - `exists`: checks key presence.
-  - all other operators (`=`, `!=`, `in`, `>`, `>=`, `<`, `<=`): evaluate to `False` when the fact is missing.
-
-## Current CI pipeline
-
-`backend-tests` runs:
-1. dependency install
-2. validate all workflow templates
-3. workflow tests (`-m workflow`)
-4. remaining tests (`-m "not workflow"`)
-5. lint (`ruff`)
-6. format check (`black --check`)
-
-`frontend-build` runs:
-1. `npm install`
-2. `npm run build`
+  - all other operators evaluate to `False` when fact is missing.
 
 ## Repository layout (current)
 
 - `workflows/<event>/<version>/compiled.json`: versioned workflow templates
 - `workflows/<event>/<version>/tests/tc_*.yaml`: regression fixtures
-- `backend/app/domain/workflow_validator.py`: graph validation + cycle detection
-- `backend/app/tools/validate_all_workflows.py`: cross-workflow validator CLI
-- `backend/app/tests/test_workflow_validation.py`: validator tests
-- `backend/app/tests/test_workflow_regressions_all.py`: auto-discovered workflow regressions
+- `backend/app/planner/`: planner engine
+- `backend/app/api/`: FastAPI routes + schemas
+- `backend/app/db/`: SQLAlchemy models + session
+- `backend/app/services/`: template/plan/task services
+- `backend/alembic/`: database migrations
+- `backend/app/tests/test_plans_api.py`: API E2E tests for M3
