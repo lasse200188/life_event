@@ -29,12 +29,16 @@ def _case_id(value: tuple[Path, Path]) -> str:
 
 
 def _assert_expected_plan_schema(expected_plan: Any, testcase_path: Path) -> None:
-    assert isinstance(expected_plan, dict), f"expected_plan must be object in {testcase_path}"
+    assert isinstance(
+        expected_plan, dict
+    ), f"expected_plan must be object in {testcase_path}"
     for key in ("workflow_id", "event_date", "tasks"):
         assert key in expected_plan, f"expected_plan.{key} missing in {testcase_path}"
 
     tasks = expected_plan["tasks"]
-    assert isinstance(tasks, list), f"expected_plan.tasks must be list in {testcase_path}"
+    assert isinstance(
+        tasks, list
+    ), f"expected_plan.tasks must be list in {testcase_path}"
 
     required_task_keys = {
         "id",
@@ -47,9 +51,9 @@ def _assert_expected_plan_schema(expected_plan: Any, testcase_path: Path) -> Non
     for idx, task in enumerate(tasks):
         assert isinstance(task, dict), f"expected_plan.tasks[{idx}] must be object"
         missing = sorted(required_task_keys - set(task.keys()))
-        assert not missing, (
-            f"expected_plan.tasks[{idx}] missing keys {missing} in {testcase_path}"
-        )
+        assert (
+            not missing
+        ), f"expected_plan.tasks[{idx}] missing keys {missing} in {testcase_path}"
 
 
 CASES = _compiled_and_testcases()

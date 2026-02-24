@@ -22,7 +22,9 @@ def generate_plan(workflow: dict[str, Any], user_input: dict[str, Any]) -> Plan:
     active_task_ids = {
         task_id
         for task_id in sorted(tasks_by_id.keys())
-        if is_task_active(_as_dict(tasks_by_id[task_id], f"tasks.{task_id}"), user_input)
+        if is_task_active(
+            _as_dict(tasks_by_id[task_id], f"tasks.{task_id}"), user_input
+        )
     }
 
     depends_on_map: dict[str, list[str]] = {task_id: [] for task_id in active_task_ids}
@@ -113,7 +115,9 @@ def _read_edges(
                 f"workflow.graph.edges[{idx}] must contain string 'from' and 'to'"
             )
         if source not in known_task_ids or target not in known_task_ids:
-            raise PlannerDependencyError("dependency references unknown workflow task id")
+            raise PlannerDependencyError(
+                "dependency references unknown workflow task id"
+            )
         parsed.append((source, target))
     return parsed
 
