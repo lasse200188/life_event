@@ -27,8 +27,16 @@ uvicorn app.main:app --reload
 ```bash
 cd frontend
 npm install
+# optional: API URL (default: http://localhost:8000)
+export NEXT_PUBLIC_API_BASE_URL='http://localhost:8000'
 npm run dev
 npm run build
+```
+
+### Browser/Backend CORS
+```bash
+# default allows localhost:3000 and 127.0.0.1:3000
+export CORS_ORIGINS='http://localhost:3000,http://127.0.0.1:3000'
 ```
 
 ## Milestone 3: Persisted Plans + Tasks API
@@ -46,6 +54,38 @@ npm run build
 - `PATCH /plans/{plan_id}/tasks/{task_id}`
   - Input: `{ "status": "done|todo|..." }`
   - Idempotent updates; `completed_at` handled consistently
+
+## Milestone 4: Minimal nutzbares Produkt (Frontend)
+
+### Implementierte Routen
+- `/events/geburt`: statische SEO Landing Page mit CTA
+- `/app/onboarding`: Facts erfassen und `POST /plans`
+- `/app/plan/{id}`: Dashboard mit Fortschritt, Fristen, kritischen Tasks
+- `/app/plan/{id}/tasks`: Taskliste, Sortierung, Status-Updates
+
+### Frontend API usage (Backend as single source of truth)
+- `POST /plans`
+- `GET /plans/{id}`
+- `GET /plans/{id}/tasks?include_metadata=true`
+- `PATCH /plans/{id}/tasks/{task_id}`
+
+### Facts-Mapping (Onboarding)
+- Gesendet werden:
+  - `birth_date`
+  - `employment_type`
+  - `married`
+  - `public_insurance` (optional)
+  - `private_insurance` (optional)
+- Bei "Keine Angabe" werden Insurance-Flags nicht gesendet (statt `false`).
+
+### Task-Metadata in API
+Beim Persistieren werden `metadata` pro Task mitgeschrieben:
+- `category`
+- `priority`
+- `tags`
+- `blocked_by`
+
+Damit koennen Frontend-Ansichten u. a. `tags: ["critical"]` fuer "kritische Tasks" nutzen.
 
 ### Error model
 All domain errors use:

@@ -7,6 +7,7 @@ import {
   getPlanTasks,
   getPlanWithSnapshot,
   patchTaskStatus,
+  type TaskStatus,
   type TaskResponse,
 } from "@/lib/api";
 import {
@@ -52,7 +53,7 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
   }, [load]);
 
   const taskStatusByKey = useMemo(() => {
-    const mapped: Record<string, string> = {};
+    const mapped: Record<string, TaskStatus> = {};
     for (const task of tasks) {
       mapped[task.task_key] = task.status;
     }

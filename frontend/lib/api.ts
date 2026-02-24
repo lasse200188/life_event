@@ -32,6 +32,7 @@ export type PlanResponse = {
     planner_plan?: {
       tasks?: Array<{
         id: string;
+        task_key?: string;
         depends_on?: string[];
       }>;
     };
@@ -52,6 +53,7 @@ export type TaskResponse = {
     priority?: number;
     category?: string;
     blocked_by?: string[];
+    tags?: string[];
   } | null;
   sort_key: number;
   completed_at: string | null;

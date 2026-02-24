@@ -69,6 +69,12 @@ class PlanService:
                 session.flush()
 
                 for idx, item in enumerate(planner_plan["tasks"]):
+                    template_tasks = template.get("tasks", {})
+                    template_task_raw = template_tasks.get(item["id"], {})
+                    template_task = (
+                        template_task_raw if isinstance(template_task_raw, dict) else {}
+                    )
+
                     raw_deadline = item.get("deadline")
                     due_date = None
                     if raw_deadline is not None:
@@ -87,6 +93,25 @@ class PlanService:
                                 message="Task deadline must be an ISO date string",
                             ) from exc
 
+                    metadata = item.get("meta") or {}
+                    if not isinstance(metadata, dict):
+                        metadata = {}
+                    metadata = {
+                        **metadata,
+                        "category": template_task.get("category"),
+                        "priority": template_task.get("priority"),
+                        "tags": (
+                            template_task.get("tags")
+                            if isinstance(template_task.get("tags"), list)
+                            else []
+                        ),
+                        "blocked_by": (
+                            item.get("depends_on")
+                            if isinstance(item.get("depends_on"), list)
+                            else []
+                        ),
+                    }
+
                     task = Task(
                         plan_id=plan.id,
                         task_key=item["id"],
@@ -94,7 +119,7 @@ class PlanService:
                         description=None,
                         status=TaskStatus.todo.value,
                         due_date=due_date,
-                        metadata_json=item.get("meta") or {},
+                        metadata_json=metadata,
                         sort_key=idx,
                     )
                     session.add(task)

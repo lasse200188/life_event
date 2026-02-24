@@ -31,12 +31,16 @@ export default function OnboardingPage() {
     setError(null);
     setIsSubmitting(true);
 
-    const facts = {
+    const facts: Record<string, unknown> = {
       birth_date: birthDate,
       employment_type: employmentType,
       married,
-      public_insurance: insuranceType === "public" || insuranceType === "both",
-      private_insurance: insuranceType === "private" || insuranceType === "both",
+      ...(insuranceType !== "none"
+        ? {
+            public_insurance: insuranceType === "public" || insuranceType === "both",
+            private_insurance: insuranceType === "private" || insuranceType === "both",
+          }
+        : {}),
     };
 
     try {

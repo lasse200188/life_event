@@ -4,7 +4,13 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 import { getPlan, getPlanTasks, type TaskResponse } from "@/lib/api";
-import { computeProgress, isOverdue, sortTasksByDeadlinePriority, toDateLabel } from "@/lib/plan";
+import {
+  computeProgress,
+  hasCriticalTag,
+  isOverdue,
+  sortTasksByDeadlinePriority,
+  toDateLabel,
+} from "@/lib/plan";
 
 type PlanPageProps = {
   params: {
@@ -57,7 +63,7 @@ export default function PlanDashboardPage({ params }: PlanPageProps) {
     [sortedTasks],
   );
   const criticalTasks = useMemo(
-    () => sortedTasks.filter((task) => isOverdue(task) || (task.metadata?.priority ?? 0) >= 85),
+    () => sortedTasks.filter((task) => isOverdue(task) || hasCriticalTag(task)),
     [sortedTasks],
   );
 

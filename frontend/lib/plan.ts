@@ -30,12 +30,23 @@ export function isOverdue(task: TaskResponse): boolean {
 export function mapDependenciesByTask(plan: PlanResponse): Record<string, string[]> {
   const items = plan.snapshot?.planner_plan?.tasks ?? [];
   const mapped: Record<string, string[]> = {};
+  const idToKey: Record<string, string> = {};
 
   for (const item of items) {
-    mapped[item.id] = item.depends_on ?? [];
+    idToKey[item.id] = item.task_key ?? item.id;
+  }
+
+  for (const item of items) {
+    const key = item.task_key ?? item.id;
+    mapped[key] = (item.depends_on ?? []).map((dependencyId) => idToKey[dependencyId] ?? dependencyId);
   }
 
   return mapped;
+}
+
+export function hasCriticalTag(task: TaskResponse): boolean {
+  const tags = task.metadata?.tags ?? [];
+  return tags.includes("critical");
 }
 
 export function computeProgress(tasks: TaskResponse[]): number {
