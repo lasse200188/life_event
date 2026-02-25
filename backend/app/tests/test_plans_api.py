@@ -279,3 +279,22 @@ def test_cannot_manually_complete_decision_task_even_with_force(
     body = response.json()
     assert body["error"]["code"] == "TASK_DECISION_MANUAL_COMPLETE_FORBIDDEN"
     assert "nicht manuell abgeschlossen" in body["error"]["message"]
+
+
+def test_tasks_without_metadata_still_include_task_kind(client: TestClient) -> None:
+    create_payload = {
+        "template_key": "birth_de/v2",
+        "facts": {
+            "birth_date": "2026-04-01",
+            "employment_type": "employed",
+            "public_insurance": True,
+            "private_insurance": True,
+        },
+    }
+    plan_id = client.post("/plans", json=create_payload).json()["id"]
+
+    tasks_response = client.get(f"/plans/{plan_id}/tasks?include_metadata=false")
+    assert tasks_response.status_code == 200
+    tasks = tasks_response.json()
+    assert any(item["task_kind"] == "decision" for item in tasks)
+    assert all(item.get("metadata") is None for item in tasks)

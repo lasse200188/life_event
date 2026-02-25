@@ -115,9 +115,12 @@ class TaskService:
     def _is_decision_task(self, task: Task) -> bool:
         metadata = self._read_metadata(task.metadata_json)
         tags = metadata.get("tags", [])
-        if not isinstance(tags, list):
-            return False
-        return any(isinstance(tag, str) and tag == "decision" for tag in tags)
+        has_decision_tag = isinstance(tags, list) and any(
+            isinstance(tag, str) and tag == "decision" for tag in tags
+        )
+        ui_actions = metadata.get("ui_actions", [])
+        has_ui_actions = isinstance(ui_actions, list) and len(ui_actions) > 0
+        return has_decision_tag or has_ui_actions
 
     def _read_metadata(self, metadata: Any) -> dict[str, Any]:
         if isinstance(metadata, dict):
