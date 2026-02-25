@@ -11,6 +11,7 @@ Das Projekt kombiniert:
 
 - Produkt-/Umsetzungsstand je Milestone: [docs/MILESTONES.md](docs/MILESTONES.md)
 - API-Referenz (aktueller Stand): [docs/API.md](docs/API.md)
+- Reminder/Scheduler Test-Guide: [docs/NOTIFICATIONS_TESTING.md](docs/NOTIFICATIONS_TESTING.md)
 - Naechste geplante Arbeiten: [ROADMAP.md](ROADMAP.md)
 - Langfristige Produktvision / Architekturleitfaden: [life_event_project_guide.md](life_event_project_guide.md)
 
@@ -104,6 +105,13 @@ export CELERY_BROKER_URL='redis://localhost:6379/0'
 
 celery -A app.worker.celery_app.celery_app worker --loglevel=info
 celery -A app.worker.celery_app.celery_app beat --loglevel=info
+```
+
+Manueller Task-Trigger:
+```bash
+cd backend
+celery -A app.worker.celery_app.celery_app call app.worker.tasks.reminder_scan_due_soon
+celery -A app.worker.celery_app.celery_app call app.worker.tasks.dispatch_pending_outbox
 ```
 
 ## Qualitaetschecks

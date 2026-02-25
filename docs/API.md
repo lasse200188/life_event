@@ -142,6 +142,10 @@ Antwort:
 - Profil-Stammdaten
 - `sendable` (true nur wenn email vorhanden, consent=true, nicht unsubscribed, reminder enabled)
 
+Hinweise:
+- `email_consent=false` setzt **nicht** automatisch `unsubscribed_at`.
+- Daily cap fuer Reminder basiert auf bereits `sent` Remindern pro Profil/Tag.
+
 ### `GET /notifications/unsubscribe?token=...`
 
 Token-basierter Opt-out fuer Reminder-Mails.
@@ -150,3 +154,7 @@ Antwort:
 ```json
 { "ok": true }
 ```
+
+Hinweise:
+- Endpoint ist idempotent (mehrfaches Klicken bleibt stabil).
+- Token ist pro Profil stabil und kann serverseitig gezielt rotiert werden.
