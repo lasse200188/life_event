@@ -245,3 +245,35 @@ def test_patch_plan_facts_recompute_switches_child_insurance_and_keeps_done(
     assert "t_add_child_insurance_gkv" in task_status_by_key
     assert "t_add_child_insurance_pkv" not in task_status_by_key
     assert task_status_by_key["t_birth_certificate"] == "done"
+
+
+def test_cannot_manually_complete_decision_task_even_with_force(
+    client: TestClient,
+) -> None:
+    create_payload = {
+        "template_key": "birth_de/v2",
+        "facts": {
+            "birth_date": "2026-04-01",
+            "employment_type": "employed",
+            "public_insurance": True,
+            "private_insurance": True,
+        },
+    }
+    plan_id = client.post("/plans", json=create_payload).json()["id"]
+
+    tasks_response = client.get(f"/plans/{plan_id}/tasks?include_metadata=true")
+    assert tasks_response.status_code == 200
+    decision_task = next(
+        item
+        for item in tasks_response.json()
+        if "decision" in item.get("metadata", {}).get("tags", [])
+    )
+
+    response = client.patch(
+        f"/plans/{plan_id}/tasks/{decision_task['id']}",
+        json={"status": "done", "force": True},
+    )
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "TASK_DECISION_MANUAL_COMPLETE_FORBIDDEN"

@@ -63,6 +63,14 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
 
   const sortedTasks = useMemo(() => sortTasksByDeadlinePriority(tasks), [tasks]);
 
+  function isDecisionTask(task: TaskResponse): boolean {
+    const tags = task.metadata?.tags ?? [];
+    if (!Array.isArray(tags)) {
+      return false;
+    }
+    return tags.includes("decision");
+  }
+
   function getUnresolvedDependencies(task: TaskResponse): string[] {
     const blockedBy = dependencies[task.task_key] ?? task.metadata?.blocked_by ?? [];
     return blockedBy.filter((dependency) => taskStatusByKey[dependency] !== "done");
@@ -118,6 +126,14 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
   }
 
   async function setChildInsuranceKind(task: TaskResponse, insuranceKind: "gkv" | "pkv") {
+    const label = insuranceKind === "gkv" ? "GKV" : "PKV";
+    const confirmed = window.confirm(
+      `Versicherung wirklich auf ${label} festlegen? Danach wird dein Plan neu berechnet.`,
+    );
+    if (!confirmed) {
+      return;
+    }
+
     setInFlight((current) => ({ ...current, [task.id]: true }));
     setError(null);
     try {
@@ -163,19 +179,22 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
 
       <section style={{ display: "grid", gap: "0.65rem" }}>
         {sortedTasks.map((task) => {
+          const isDecision = isDecisionTask(task);
           const unresolved = getUnresolvedDependencies(task);
           const isBlocked = task.status !== "done" && unresolved.length > 0;
 
           return (
             <article key={task.id} className="card" style={{ display: "grid", gap: "0.45rem" }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: "0.65rem" }}>
-                <input
-                  checked={task.status === "done"}
-                  disabled={Boolean(inFlight[task.id]) || isBlocked}
-                  onChange={() => void toggleDone(task)}
-                  type="checkbox"
-                  style={{ marginTop: "0.35rem" }}
-                />
+                {isDecision ? null : (
+                  <input
+                    checked={task.status === "done"}
+                    disabled={Boolean(inFlight[task.id]) || isBlocked}
+                    onChange={() => void toggleDone(task)}
+                    type="checkbox"
+                    style={{ marginTop: "0.35rem" }}
+                  />
+                )}
                 <div style={{ flex: 1 }}>
                   <strong>{task.title}</strong>
                   <div style={{ marginTop: "0.3rem", color: "#5b665f", fontSize: "0.9rem" }}>
@@ -204,7 +223,7 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
                   </button>
                 </div>
               ) : null}
-              {task.task_key === "t_decide_child_insurance" ? (
+              {isDecision ? (
                 <div style={{ display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
                   <button
                     className="button button-primary"

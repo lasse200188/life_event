@@ -46,6 +46,15 @@ class TaskService:
         now = datetime.now(UTC)
 
         if status == TaskStatus.done:
+            if self._is_decision_task(task):
+                raise ApiError(
+                    status_code=409,
+                    code="TASK_DECISION_MANUAL_COMPLETE_FORBIDDEN",
+                    message=(
+                        "Decision-Task kann nicht manuell abgeschlossen werden; "
+                        "bitte Auswahl treffen."
+                    ),
+                )
             unresolved = self._read_unresolved_dependencies(session, task)
             block_type = self._read_block_type(task.metadata_json)
             if unresolved and block_type == "hard" and not force:
@@ -102,3 +111,10 @@ class TaskService:
         if block_type not in {"hard", "soft"}:
             return "hard"
         return block_type
+
+    def _is_decision_task(self, task: Task) -> bool:
+        metadata = task.metadata_json if isinstance(task.metadata_json, dict) else {}
+        tags = metadata.get("tags", [])
+        if not isinstance(tags, list):
+            return False
+        return any(isinstance(tag, str) and tag == "decision" for tag in tags)

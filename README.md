@@ -55,6 +55,13 @@ export CORS_ORIGINS='http://localhost:3000,http://127.0.0.1:3000'
   - Input: `{ "status": "done|todo|...", "force": false }`
   - Idempotent updates; `completed_at` handled consistently
   - Blocked tasks require `force: true` (otherwise `409 TASK_BLOCKED`)
+  - Decision-Tasks (`metadata.tags` contains `decision`) cannot be manually completed (`409 TASK_DECISION_MANUAL_COMPLETE_FORBIDDEN`)
+- `PATCH /plans/{plan_id}/facts`
+  - Input: `{ "facts": {...}, "recompute": true|false }`
+  - Merges facts and optionally recomputes plan/tasks
+- `POST /plans/{plan_id}/recompute`
+  - Rebuilds active tasks from current facts
+  - Keeps already completed tasks as `done` by `task_key` when still active
 
 ## Milestone 4: Minimal nutzbares Produkt (Frontend)
 
@@ -69,6 +76,13 @@ export CORS_ORIGINS='http://localhost:3000,http://127.0.0.1:3000'
 - `GET /plans/{id}`
 - `GET /plans/{id}/tasks?include_metadata=true`
 - `PATCH /plans/{id}/tasks/{task_id}`
+- `PATCH /plans/{id}/facts`
+- `POST /plans/{id}/recompute`
+
+### Decision-Task UX (v2)
+- Decision-Tasks are detected via `metadata.tags` containing `decision`.
+- Decision-Tasks do not render the done-checkbox in the task list.
+- User selections (e.g. child insurance GKV/PKV) require confirmation before facts patch + recompute.
 
 ### Facts-Mapping (Onboarding)
 - Gesendet werden:
@@ -103,6 +117,8 @@ Error code convention:
 - `TEMPLATE_NOT_FOUND`
 - `PLAN_NOT_FOUND`
 - `TASK_NOT_FOUND`
+- `TASK_BLOCKED`
+- `TASK_DECISION_MANUAL_COMPLETE_FORBIDDEN`
 - `PLANNER_INPUT_INVALID`
 - `PERSISTENCE_ERROR`
 
