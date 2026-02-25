@@ -70,6 +70,28 @@ class NotificationOutboxService:
         )
         return int(session.scalar(stmt) or 0)
 
+    def count_sent_today(
+        self,
+        session: Session,
+        *,
+        profile_id: UUID,
+        now: datetime,
+    ) -> int:
+        local_day = now.astimezone(BERLIN_TZ).date()
+        start_local = datetime.combine(local_day, datetime.min.time(), tzinfo=BERLIN_TZ)
+        end_local = start_local + timedelta(days=1)
+        start_utc = start_local.astimezone(UTC)
+        end_utc = end_local.astimezone(UTC)
+
+        stmt = select(func.count(NotificationOutbox.id)).where(
+            NotificationOutbox.profile_id == profile_id,
+            NotificationOutbox.status == NotificationOutboxStatus.sent.value,
+            NotificationOutbox.sent_at.is_not(None),
+            NotificationOutbox.sent_at >= start_utc,
+            NotificationOutbox.sent_at < end_utc,
+        )
+        return int(session.scalar(stmt) or 0)
+
     def lock_pending_batch(
         self, session: Session, *, now: datetime, limit: int
     ) -> list[NotificationOutbox]:
@@ -122,12 +144,14 @@ class NotificationOutboxService:
         error_message: str | None,
         now: datetime,
         max_attempts: int = 5,
+        count_attempt: bool = True,
     ) -> None:
         item = session.get(NotificationOutbox, outbox_id)
         if item is None:
             return
 
-        item.attempt_count += 1
+        if count_attempt:
+            item.attempt_count += 1
         item.failure_class = failure_class
         item.last_error_code = error_code
         item.last_error_message = (error_message or "")[:500]
@@ -136,7 +160,7 @@ class NotificationOutboxService:
         if failure_class == NotificationFailureClass.permanent.value:
             item.status = NotificationOutboxStatus.dead.value
             item.next_attempt_at = now
-        elif item.attempt_count >= max_attempts:
+        elif count_attempt and item.attempt_count >= max_attempts:
             item.status = NotificationOutboxStatus.dead.value
             item.failure_class = NotificationFailureClass.permanent.value
             item.last_error_code = "retry_exhausted"
@@ -152,6 +176,26 @@ class NotificationOutboxService:
             item.status = NotificationOutboxStatus.pending.value
             item.next_attempt_at = candidate
 
+        session.add(item)
+        session.commit()
+
+    def reschedule_quiet_hours(
+        self,
+        session: Session,
+        *,
+        outbox_id: UUID,
+        now: datetime,
+    ) -> None:
+        item = session.get(NotificationOutbox, outbox_id)
+        if item is None:
+            return
+
+        item.status = NotificationOutboxStatus.pending.value
+        item.failure_class = NotificationFailureClass.retryable.value
+        item.last_error_code = "QUIET_HOURS"
+        item.last_error_message = "outside send window"
+        item.next_attempt_at = next_send_window_start(now)
+        item.updated_at = now
         session.add(item)
         session.commit()
 

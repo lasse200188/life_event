@@ -53,7 +53,7 @@ class ReminderScannerService:
                     skipped_not_sendable += 1
                     continue
 
-                sent_today = self.outbox_service.count_created_today(
+                sent_today = self.outbox_service.count_sent_today(
                     session,
                     profile_id=profile.id,
                     now=now,

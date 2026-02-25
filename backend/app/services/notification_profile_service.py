@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import hashlib
-import secrets
+import hmac
+import os
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -12,6 +13,12 @@ from app.db.models import NotificationProfile
 
 
 class NotificationProfileService:
+    def __init__(self) -> None:
+        self._token_secret = os.getenv(
+            "NOTIFICATION_TOKEN_SECRET",
+            os.getenv("APP_SECRET", "dev-notification-secret"),
+        )
+
     def get_or_create(self, session: Session, *, plan_id: UUID) -> NotificationProfile:
         profile = session.scalar(
             select(NotificationProfile).where(NotificationProfile.plan_id == plan_id)
@@ -45,11 +52,6 @@ class NotificationProfileService:
         profile.timezone = timezone
         profile.reminder_due_soon_enabled = reminder_due_soon_enabled
 
-        if not email_consent:
-            profile.unsubscribed_at = datetime.now(UTC)
-        elif profile.unsubscribed_at is not None:
-            profile.unsubscribed_at = None
-
         profile.updated_at = datetime.now(UTC)
         session.add(profile)
         session.commit()
@@ -68,8 +70,10 @@ class NotificationProfileService:
     def issue_unsubscribe_token(
         self, session: Session, *, profile: NotificationProfile
     ) -> str:
-        token = secrets.token_urlsafe(24)
-        profile.unsubscribe_token_hash = self._hash_token(token)
+        token = self._stable_unsubscribe_token(profile.id)
+        token_hash = self._hash_token(token)
+        if profile.unsubscribe_token_hash != token_hash:
+            profile.unsubscribe_token_hash = token_hash
         profile.updated_at = datetime.now(UTC)
         session.add(profile)
         session.flush()
@@ -95,3 +99,11 @@ class NotificationProfileService:
 
     def _hash_token(self, token: str) -> str:
         return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+    def _stable_unsubscribe_token(self, profile_id: UUID) -> str:
+        signature = hmac.new(
+            self._token_secret.encode("utf-8"),
+            str(profile_id).encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        return f"{profile_id}.{signature}"

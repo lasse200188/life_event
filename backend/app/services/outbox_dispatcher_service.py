@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from app.notifications.brevo_provider import BrevoEmailProvider
 from app.notifications.config import NotificationConfig
 from app.notifications.templates import render_task_due_soon
-from app.notifications.time_utils import is_within_send_window, next_send_window_start
+from app.notifications.time_utils import is_within_send_window
 from app.services.notification_outbox_service import NotificationOutboxService
 
 logger = logging.getLogger(__name__)
@@ -52,16 +52,12 @@ class OutboxDispatcherService:
                 to_email = ""
 
             if not is_within_send_window(now):
-                self.outbox_service.mark_failed_or_retry(
+                self.outbox_service.reschedule_quiet_hours(
                     session,
                     outbox_id=item.id,
-                    failure_class="retryable",
-                    error_code="QUIET_HOURS",
-                    error_message="outside send window",
-                    now=next_send_window_start(now),
+                    now=now,
                 )
                 skipped_quiet_hours += 1
-                retried += 1
                 continue
 
             rendered = render_task_due_soon(payload)
