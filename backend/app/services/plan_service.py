@@ -108,6 +108,11 @@ class PlanService:
                             if isinstance(template_task.get("tags"), list)
                             else []
                         ),
+                        "ui_actions": (
+                            template_task.get("ui_actions")
+                            if isinstance(template_task.get("ui_actions"), list)
+                            else []
+                        ),
                         "blocked_by": (
                             item.get("depends_on")
                             if isinstance(item.get("depends_on"), list)
@@ -254,6 +259,11 @@ class PlanService:
                     "tags": (
                         template_task.get("tags")
                         if isinstance(template_task.get("tags"), list)
+                        else []
+                    ),
+                    "ui_actions": (
+                        template_task.get("ui_actions")
+                        if isinstance(template_task.get("ui_actions"), list)
                         else []
                     ),
                     "blocked_by": (

@@ -98,9 +98,16 @@ Beim Persistieren werden `metadata` pro Task mitgeschrieben:
 - `category`
 - `priority`
 - `tags`
+- `ui_actions`
 - `blocked_by`
 
 Damit koennen Frontend-Ansichten u. a. `tags: ["critical"]` fuer "kritische Tasks" nutzen.
+
+Zusätzlich liefert die Task-API ein explizites Feld `task_kind`:
+- `normal`
+- `decision`
+
+`task_kind` wird serverseitig berechnet (`decision`, wenn `metadata.tags` `decision` enthält oder `metadata.ui_actions` gesetzt ist). Dadurch ist die UI von Template-Details entkoppelt.
 
 ### Error model
 All domain errors use:

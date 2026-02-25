@@ -64,11 +64,7 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
   const sortedTasks = useMemo(() => sortTasksByDeadlinePriority(tasks), [tasks]);
 
   function isDecisionTask(task: TaskResponse): boolean {
-    const tags = task.metadata?.tags ?? [];
-    if (!Array.isArray(tags)) {
-      return false;
-    }
-    return tags.includes("decision");
+    return task.task_kind === "decision";
   }
 
   function getUnresolvedDependencies(task: TaskResponse): string[] {

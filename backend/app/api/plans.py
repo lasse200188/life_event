@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from typing import Any
 from uuid import UUID
 
@@ -114,15 +115,17 @@ def update_task_status(
 
 
 def _serialize_task(task: Any, *, include_metadata: bool) -> TaskResponse:
+    metadata = _read_metadata(task.metadata_json)
     return TaskResponse(
         id=task.id,
         plan_id=task.plan_id,
         task_key=task.task_key,
         title=task.title,
         description=task.description,
+        task_kind=_derive_task_kind(metadata),
         status=TaskStatus(task.status),
         due_date=task.due_date,
-        metadata=task.metadata_json if include_metadata else None,
+        metadata=metadata if include_metadata else None,
         sort_key=task.sort_key,
         completed_at=task.completed_at,
         created_at=task.created_at,
@@ -153,3 +156,28 @@ def _serialize_plan(plan: Any, *, include_snapshot: bool) -> PlanResponse:
         snapshot_meta=snapshot_meta,
         snapshot=snapshot if include_snapshot else None,
     )
+
+
+def _derive_task_kind(metadata: dict[str, Any]) -> str:
+    raw_tags = metadata.get("tags", [])
+    tags = raw_tags if isinstance(raw_tags, list) else []
+    has_decision_tag = any(isinstance(tag, str) and tag == "decision" for tag in tags)
+
+    raw_actions = metadata.get("ui_actions", [])
+    has_ui_actions = isinstance(raw_actions, list) and len(raw_actions) > 0
+
+    if has_decision_tag or has_ui_actions:
+        return "decision"
+    return "normal"
+
+
+def _read_metadata(metadata: Any) -> dict[str, Any]:
+    if isinstance(metadata, dict):
+        return metadata
+    if isinstance(metadata, str):
+        try:
+            parsed = json.loads(metadata)
+        except (json.JSONDecodeError, TypeError):
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}

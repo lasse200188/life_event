@@ -263,6 +263,7 @@ def test_cannot_manually_complete_decision_task_even_with_force(
 
     tasks_response = client.get(f"/plans/{plan_id}/tasks?include_metadata=true")
     assert tasks_response.status_code == 200
+    assert any(item.get("task_kind") == "decision" for item in tasks_response.json())
     decision_task = next(
         item
         for item in tasks_response.json()
@@ -277,3 +278,4 @@ def test_cannot_manually_complete_decision_task_even_with_force(
     assert response.status_code == 409
     body = response.json()
     assert body["error"]["code"] == "TASK_DECISION_MANUAL_COMPLETE_FORBIDDEN"
+    assert "nicht manuell abgeschlossen" in body["error"]["message"]

@@ -47,6 +47,7 @@ export type TaskResponse = {
   task_key: string;
   title: string;
   description: string | null;
+  task_kind: "normal" | "decision";
   status: TaskStatus;
   due_date: string | null;
   metadata?: {

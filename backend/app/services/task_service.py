@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID
@@ -82,7 +83,7 @@ class TaskService:
         return task
 
     def _read_unresolved_dependencies(self, session: Session, task: Task) -> list[str]:
-        metadata = task.metadata_json if isinstance(task.metadata_json, dict) else {}
+        metadata = self._read_metadata(task.metadata_json)
         raw_blocked_by = metadata.get("blocked_by", [])
         if not isinstance(raw_blocked_by, list):
             return []
@@ -105,16 +106,26 @@ class TaskService:
         return unresolved
 
     def _read_block_type(self, metadata: Any) -> str:
-        if not isinstance(metadata, dict):
-            return "hard"
-        block_type = metadata.get("block_type", "hard")
+        payload = self._read_metadata(metadata)
+        block_type = payload.get("block_type", "hard")
         if block_type not in {"hard", "soft"}:
             return "hard"
         return block_type
 
     def _is_decision_task(self, task: Task) -> bool:
-        metadata = task.metadata_json if isinstance(task.metadata_json, dict) else {}
+        metadata = self._read_metadata(task.metadata_json)
         tags = metadata.get("tags", [])
         if not isinstance(tags, list):
             return False
         return any(isinstance(tag, str) and tag == "decision" for tag in tags)
+
+    def _read_metadata(self, metadata: Any) -> dict[str, Any]:
+        if isinstance(metadata, dict):
+            return metadata
+        if isinstance(metadata, str):
+            try:
+                parsed = json.loads(metadata)
+            except (json.JSONDecodeError, TypeError):
+                return {}
+            return parsed if isinstance(parsed, dict) else {}
+        return {}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from typing import Any
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -61,6 +62,7 @@ class TaskResponse(BaseModel):
     task_key: str
     title: str
     description: str | None
+    task_kind: Literal["normal", "decision"] = "normal"
     status: TaskStatus
     due_date: date | None
     metadata: dict[str, Any] | None = None
