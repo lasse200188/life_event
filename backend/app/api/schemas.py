@@ -14,6 +14,11 @@ class PlanCreateRequest(BaseModel):
     facts: dict[str, Any]
 
 
+class PlanFactsPatchRequest(BaseModel):
+    facts: dict[str, Any]
+    recompute: bool = True
+
+
 class PlanCreateLinks(BaseModel):
     self: str
     tasks: str

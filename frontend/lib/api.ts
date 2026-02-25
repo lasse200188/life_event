@@ -136,3 +136,20 @@ export async function patchTaskStatus(
     body: JSON.stringify({ status, force }),
   });
 }
+
+export async function patchPlanFacts(
+  planId: string,
+  facts: Record<string, unknown>,
+  recompute = true,
+): Promise<PlanResponse> {
+  return apiRequest<PlanResponse>(`/plans/${planId}/facts`, {
+    method: "PATCH",
+    body: JSON.stringify({ facts, recompute }),
+  });
+}
+
+export async function recomputePlan(planId: string): Promise<PlanResponse> {
+  return apiRequest<PlanResponse>(`/plans/${planId}/recompute`, {
+    method: "POST",
+  });
+}

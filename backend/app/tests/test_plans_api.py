@@ -175,3 +175,71 @@ def test_can_force_complete_blocked_task(client: TestClient) -> None:
     body = response.json()
     assert body["status"] == "done"
     assert body["completed_at"] is not None
+
+
+def test_create_plan_v2_normalizes_child_insurance_unknown_when_ambiguous(
+    client: TestClient,
+) -> None:
+    create_payload = {
+        "template_key": "birth_de/v2",
+        "facts": {
+            "birth_date": "2026-04-01",
+            "employment_type": "employed",
+            "public_insurance": True,
+            "private_insurance": True,
+        },
+    }
+
+    create_response = client.post("/plans", json=create_payload)
+    assert create_response.status_code == 201
+    plan_id = create_response.json()["id"]
+
+    plan_response = client.get(f"/plans/{plan_id}")
+    assert plan_response.status_code == 200
+    plan_body = plan_response.json()
+    assert plan_body["facts"]["child_insurance_kind"] == "unknown"
+
+    tasks_response = client.get(f"/plans/{plan_id}/tasks")
+    assert tasks_response.status_code == 200
+    task_keys = {item["task_key"] for item in tasks_response.json()}
+    assert "t_decide_child_insurance" in task_keys
+    assert "t_add_child_insurance_gkv" not in task_keys
+    assert "t_add_child_insurance_pkv" not in task_keys
+
+
+def test_patch_plan_facts_recompute_switches_child_insurance_and_keeps_done(
+    client: TestClient,
+) -> None:
+    create_payload = {
+        "template_key": "birth_de/v2",
+        "facts": {
+            "birth_date": "2026-04-01",
+            "employment_type": "employed",
+            "public_insurance": True,
+            "private_insurance": True,
+        },
+    }
+    plan_id = client.post("/plans", json=create_payload).json()["id"]
+
+    tasks_before = client.get(f"/plans/{plan_id}/tasks").json()
+    birth_task = next(item for item in tasks_before if item["task_key"] == "t_birth_certificate")
+    done_response = client.patch(
+        f"/plans/{plan_id}/tasks/{birth_task['id']}",
+        json={"status": "done"},
+    )
+    assert done_response.status_code == 200
+
+    patch_response = client.patch(
+        f"/plans/{plan_id}/facts",
+        json={"facts": {"child_insurance_kind": "gkv"}, "recompute": True},
+    )
+    assert patch_response.status_code == 200
+    patched_plan = patch_response.json()
+    assert patched_plan["facts"]["child_insurance_kind"] == "gkv"
+
+    tasks_after = client.get(f"/plans/{plan_id}/tasks").json()
+    task_status_by_key = {item["task_key"]: item["status"] for item in tasks_after}
+    assert "t_decide_child_insurance" not in task_status_by_key
+    assert "t_add_child_insurance_gkv" in task_status_by_key
+    assert "t_add_child_insurance_pkv" not in task_status_by_key
+    assert task_status_by_key["t_birth_certificate"] == "done"

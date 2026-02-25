@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getPlanTasks,
   getPlanWithSnapshot,
+  patchPlanFacts,
   patchTaskStatus,
   type TaskStatus,
   type TaskResponse,
@@ -116,6 +117,23 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
     }
   }
 
+  async function setChildInsuranceKind(task: TaskResponse, insuranceKind: "gkv" | "pkv") {
+    setInFlight((current) => ({ ...current, [task.id]: true }));
+    setError(null);
+    try {
+      await patchPlanFacts(params.id, { child_insurance_kind: insuranceKind }, true);
+      await load();
+    } catch (updateError) {
+      setError(
+        updateError instanceof Error
+          ? updateError.message
+          : "Entscheidung konnte nicht gespeichert werden.",
+      );
+    } finally {
+      setInFlight((current) => ({ ...current, [task.id]: false }));
+    }
+  }
+
   if (loading) {
     return (
       <main>
@@ -183,6 +201,26 @@ export default function PlanTasksPage({ params }: TaskListPageProps) {
                     type="button"
                   >
                     Trotzdem als erledigt markieren
+                  </button>
+                </div>
+              ) : null}
+              {task.task_key === "t_decide_child_insurance" ? (
+                <div style={{ display: "flex", gap: "0.45rem", flexWrap: "wrap" }}>
+                  <button
+                    className="button button-primary"
+                    disabled={Boolean(inFlight[task.id])}
+                    onClick={() => void setChildInsuranceKind(task, "gkv")}
+                    type="button"
+                  >
+                    GKV waehlen
+                  </button>
+                  <button
+                    className="button button-ghost"
+                    disabled={Boolean(inFlight[task.id])}
+                    onClick={() => void setChildInsuranceKind(task, "pkv")}
+                    type="button"
+                  >
+                    PKV waehlen
                   </button>
                 </div>
               ) : null}

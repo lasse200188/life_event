@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.api.schemas import (
+    PlanFactsPatchRequest,
     PlanCreateLinks,
     PlanCreateRequest,
     PlanCreateResponse,
@@ -55,28 +56,31 @@ def get_plan(
 ) -> PlanResponse:
     plan = PlanService().get_plan(session, plan_id)
 
-    snapshot = plan.snapshot if isinstance(plan.snapshot, dict) else {}
-    snapshot_meta = SnapshotMeta(
-        generated_at=snapshot.get("generated_at"),
-        task_count=snapshot.get("task_count"),
-        engine_version=snapshot.get("engine_version"),
-        template_key=(
-            snapshot.get("template_meta", {}).get("template_key")
-            if isinstance(snapshot.get("template_meta"), dict)
-            else None
-        ),
-    )
+    return _serialize_plan(plan, include_snapshot=include_snapshot)
 
-    return PlanResponse(
-        id=plan.id,
-        template_key=plan.template_key,
-        facts=plan.facts,
-        status=plan.status,
-        created_at=plan.created_at,
-        updated_at=plan.updated_at,
-        snapshot_meta=snapshot_meta,
-        snapshot=snapshot if include_snapshot else None,
+
+@router.patch("/plans/{plan_id}/facts", response_model=PlanResponse)
+def patch_plan_facts(
+    plan_id: UUID,
+    payload: PlanFactsPatchRequest,
+    session: Session = Depends(get_db_session),
+) -> PlanResponse:
+    plan = PlanService().update_facts(
+        session,
+        plan_id=plan_id,
+        facts_patch=payload.facts,
+        recompute=payload.recompute,
     )
+    return _serialize_plan(plan, include_snapshot=False)
+
+
+@router.post("/plans/{plan_id}/recompute", response_model=PlanResponse)
+def recompute_plan(
+    plan_id: UUID,
+    session: Session = Depends(get_db_session),
+) -> PlanResponse:
+    plan = PlanService().recompute_plan(session, plan_id=plan_id)
+    return _serialize_plan(plan, include_snapshot=False)
 
 
 @router.get("/plans/{plan_id}/tasks", response_model=list[TaskResponse])
@@ -123,4 +127,29 @@ def _serialize_task(task: Any, *, include_metadata: bool) -> TaskResponse:
         completed_at=task.completed_at,
         created_at=task.created_at,
         updated_at=task.updated_at,
+    )
+
+
+def _serialize_plan(plan: Any, *, include_snapshot: bool) -> PlanResponse:
+    snapshot = plan.snapshot if isinstance(plan.snapshot, dict) else {}
+    snapshot_meta = SnapshotMeta(
+        generated_at=snapshot.get("generated_at"),
+        task_count=snapshot.get("task_count"),
+        engine_version=snapshot.get("engine_version"),
+        template_key=(
+            snapshot.get("template_meta", {}).get("template_key")
+            if isinstance(snapshot.get("template_meta"), dict)
+            else None
+        ),
+    )
+
+    return PlanResponse(
+        id=plan.id,
+        template_key=plan.template_key,
+        facts=plan.facts,
+        status=plan.status,
+        created_at=plan.created_at,
+        updated_at=plan.updated_at,
+        snapshot_meta=snapshot_meta,
+        snapshot=snapshot if include_snapshot else None,
     )

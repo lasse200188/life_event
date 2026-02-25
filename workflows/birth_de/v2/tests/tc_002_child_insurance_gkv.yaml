@@ -1,0 +1,60 @@
+name: "Child insurance gkv selected: only gkv task shown"
+template_id: birth_de
+template_version: 2
+
+facts:
+  state: NW
+  birth_date: "2026-02-28"
+  married: true
+  employment_type: mixed
+  public_insurance: true
+  private_insurance: false
+  child_insurance_kind: gkv
+  income_gap_ratio: 1.5
+
+expect:
+  tasks_present:
+    - t_add_child_insurance_gkv
+  tasks_absent:
+    - t_decide_child_insurance
+    - t_add_child_insurance_pkv
+  deadlines:
+    t_birth_certificate: 2026-03-07
+    t_add_child_insurance_gkv: 2026-03-30
+  recommendations_present:
+    - r_tax_class_switch_hint
+
+expected_plan:
+  workflow_id: birth_de
+  event_date: "2026-02-28"
+  tasks:
+    - id: t_birth_certificate
+      title: Geburtsurkunde beantragen
+      relative_days: 7
+      deadline: "2026-03-07"
+      depends_on: []
+      meta: {}
+    - id: t_add_child_insurance_gkv
+      title: Kind bei gesetzlicher Krankenkasse mitversichern
+      relative_days: 30
+      deadline: "2026-03-30"
+      depends_on: [t_birth_certificate]
+      meta: {}
+    - id: t_child_benefit
+      title: Kindergeld beantragen
+      relative_days: 90
+      deadline: "2026-05-29"
+      depends_on: [t_birth_certificate]
+      meta: {}
+    - id: t_parental_allowance
+      title: Elterngeld beantragen
+      relative_days: 90
+      deadline: "2026-05-29"
+      depends_on: [t_birth_certificate]
+      meta: {}
+    - id: t_parental_leave_employer
+      title: Elternzeit beim Arbeitgeber anmelden
+      relative_days: 7
+      deadline: "2026-03-07"
+      depends_on: []
+      meta: {}
