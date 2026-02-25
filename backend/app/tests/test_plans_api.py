@@ -222,7 +222,9 @@ def test_patch_plan_facts_recompute_switches_child_insurance_and_keeps_done(
     plan_id = client.post("/plans", json=create_payload).json()["id"]
 
     tasks_before = client.get(f"/plans/{plan_id}/tasks").json()
-    birth_task = next(item for item in tasks_before if item["task_key"] == "t_birth_certificate")
+    birth_task = next(
+        item for item in tasks_before if item["task_key"] == "t_birth_certificate"
+    )
     done_response = client.patch(
         f"/plans/{plan_id}/tasks/{birth_task['id']}",
         json={"status": "done"},

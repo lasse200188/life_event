@@ -205,7 +205,9 @@ class PlanService:
         )
         for existing_task in existing_tasks:
             if existing_task.status == TaskStatus.done.value:
-                done_status_by_task_key[existing_task.task_key] = existing_task.completed_at
+                done_status_by_task_key[existing_task.task_key] = (
+                    existing_task.completed_at
+                )
 
         try:
             plan.facts = normalized_facts
