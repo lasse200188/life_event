@@ -11,6 +11,7 @@ Stand: 2026-02-25
 | M3 | abgeschlossen | Persistenz von Plaenen/Tasks + Plans/Tasks API |
 | M4 | abgeschlossen | Frontend-MVP (Onboarding, Dashboard, Taskliste) |
 | M5 | abgeschlossen | Decision-Task-Flow + Fact-Recompute + task_kind API-Semantik |
+| M6 | abgeschlossen | Reminder-Notifications (Celery + Outbox + Brevo + Templates) |
 
 ## Details
 
@@ -72,9 +73,27 @@ Umgesetzt:
 - Frontend-Confirm vor Entscheidungs-Action
 - Neues API-Feld `task_kind` (`normal|decision`) fuer UI-Entkopplung
 
+### M6 - Reminder Notifications
+
+Ziel:
+- Zuverlaessige Deadline-Reminder mit Idempotenz und robustem Versand
+
+Umgesetzt:
+- Tabellen `notification_profiles` (Opt-in/Praeferenzen) und `notification_outbox` (Queue + Status)
+- Periodische Celery-Jobs:
+  - taeglicher Due-soon-Scan
+  - regelmaessiger Outbox-Dispatch
+- Due-soon-Logik in `Europe/Berlin` fuer Fenster `heute..heute+3`
+- Dedupe pro Profil/Tag/Typ/Channel via `dedupe_key_raw` (unique)
+- Outbox-Lifecycle `pending|sending|sent|dead` mit Retry-Backoff, Jitter, `stuck sending`-Recovery
+- Brevo API Provider mit Fehlerklassifizierung (permanent vs retryable) und Dry-run/Whitelist fuer dev
+- Template-Rendering fuer `task_due_soon` (Subject + Text + HTML, de-DE Datumsformat)
+- Neue API-Endpunkte:
+  - `PUT /plans/{id}/notification-profile`
+  - `GET /notifications/unsubscribe?token=...`
+
 ## Nicht-Ziele der bisherigen Milestones
 
 - Vollstaendige Auth-/Account-Journeys
 - Dokumenten-Upload mit produktiver Storage-Integration
-- Reminder/Notification-Worker in Produktion
 - Multi-Event-Portfolio ueber Geburt hinaus

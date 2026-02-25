@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.notifications import router as notifications_router
 from app.api.plans import router as plans_router
 from app.db.base import Base
 from app.db.session import get_engine
@@ -64,6 +65,7 @@ def create_app() -> FastAPI:
         return {"status": "ok"}
 
     app.include_router(plans_router)
+    app.include_router(notifications_router)
     return app
 
 

@@ -79,3 +79,30 @@ class TaskStatusPatchRequest(BaseModel):
 
 class ErrorEnvelope(BaseModel):
     error: dict[str, Any]
+
+
+class NotificationProfileUpsertRequest(BaseModel):
+    email: str | None = None
+    email_consent: bool = False
+    locale: str = "de-DE"
+    timezone: str = "Europe/Berlin"
+    reminder_due_soon_enabled: bool = True
+
+
+class NotificationProfileResponse(BaseModel):
+    id: UUID
+    plan_id: UUID
+    email: str | None
+    email_consent: bool
+    locale: str
+    timezone: str
+    reminder_due_soon_enabled: bool
+    max_reminders_per_day: int
+    unsubscribed_at: datetime | None
+    sendable: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class NotificationUnsubscribeResponse(BaseModel):
+    ok: bool = True

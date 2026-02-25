@@ -120,3 +120,33 @@ Typische Codes:
 - `PLANNER_INPUT_INVALID`
 - `PERSISTENCE_ERROR`
 - `REQUEST_VALIDATION_ERROR`
+
+## Notifications
+
+### `PUT /plans/{plan_id}/notification-profile`
+
+Setzt Reminder-Einstellungen fuer einen Plan (MVP ohne Auth).
+
+Request:
+```json
+{
+  "email": "user@example.com",
+  "email_consent": true,
+  "locale": "de-DE",
+  "timezone": "Europe/Berlin",
+  "reminder_due_soon_enabled": true
+}
+```
+
+Antwort:
+- Profil-Stammdaten
+- `sendable` (true nur wenn email vorhanden, consent=true, nicht unsubscribed, reminder enabled)
+
+### `GET /notifications/unsubscribe?token=...`
+
+Token-basierter Opt-out fuer Reminder-Mails.
+
+Antwort:
+```json
+{ "ok": true }
+```

@@ -85,6 +85,27 @@ Frontend erreichbar unter `http://localhost:3000`.
 export CORS_ORIGINS='http://localhost:3000,http://127.0.0.1:3000'
 ```
 
+### 5) Reminder-Worker (Milestone Notifications)
+
+```bash
+cd backend
+
+# Default: dry-run aktiv, damit keine echten Mails rausgehen
+export EMAIL_DRY_RUN=true
+export APP_BASE_URL='http://localhost:3000'
+export EMAIL_FROM_ADDRESS='noreply@example.com'
+export EMAIL_FROM_NAME='Life Event'
+export CELERY_BROKER_URL='redis://localhost:6379/0'
+
+# nur fuer echten Versand:
+# export BREVO_API_KEY='...'
+# optional whitelist fuer dev/staging
+# export EMAIL_ALLOWED_RECIPIENT_DOMAINS='example.com,test.local'
+
+celery -A app.worker.celery_app.celery_app worker --loglevel=info
+celery -A app.worker.celery_app.celery_app beat --loglevel=info
+```
+
 ## Qualitaetschecks
 
 ### Backend

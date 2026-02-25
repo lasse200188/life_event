@@ -38,6 +38,26 @@ class TaskStatus(str, Enum):
     skipped = "skipped"
 
 
+class NotificationChannel(str, Enum):
+    email = "email"
+
+
+class NotificationType(str, Enum):
+    task_due_soon = "task_due_soon"
+
+
+class NotificationOutboxStatus(str, Enum):
+    pending = "pending"
+    sending = "sending"
+    sent = "sent"
+    dead = "dead"
+
+
+class NotificationFailureClass(str, Enum):
+    retryable = "retryable"
+    permanent = "permanent"
+
+
 JSON_TYPE = JSON().with_variant(JSONB(), "postgresql")
 JSON_EMPTY_DEFAULT = (
     text("'{}'::jsonb")
@@ -99,3 +119,77 @@ class Task(Base):
     )
 
     plan: Mapped[Plan] = relationship(back_populates="tasks")
+
+
+class NotificationProfile(Base):
+    __tablename__ = "notification_profiles"
+    __table_args__ = (
+        UniqueConstraint("plan_id", name="uq_notification_profiles_plan_id"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    plan_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("plans.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    email: Mapped[str | None] = mapped_column(Text, nullable=True)
+    email_consent: Mapped[bool] = mapped_column(nullable=False, default=False)
+    locale: Mapped[str] = mapped_column(String(16), nullable=False, default="de-DE")
+    timezone: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="Europe/Berlin"
+    )
+    reminder_due_soon_enabled: Mapped[bool] = mapped_column(
+        nullable=False, default=True
+    )
+    max_reminders_per_day: Mapped[int] = mapped_column(nullable=False, default=1)
+    unsubscribed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    unsubscribe_token_hash: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    plan: Mapped[Plan] = relationship()
+
+
+class NotificationOutbox(Base):
+    __tablename__ = "notification_outbox"
+    __table_args__ = (
+        UniqueConstraint("dedupe_key_raw", name="uq_notification_outbox_dedupe_key_raw"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("notification_profiles.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    channel: Mapped[str] = mapped_column(String(32), nullable=False)
+    type: Mapped[str] = mapped_column(String(64), nullable=False)
+    dedupe_key_raw: Mapped[str] = mapped_column(Text, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(
+        JSON_TYPE,
+        nullable=False,
+        server_default=JSON_EMPTY_DEFAULT,
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    failure_class: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    next_attempt_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    attempt_count: Mapped[int] = mapped_column(nullable=False, default=0)
+    last_error_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    last_error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+
+    profile: Mapped[NotificationProfile] = relationship()
