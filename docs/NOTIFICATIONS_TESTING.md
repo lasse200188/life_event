@@ -13,6 +13,7 @@ docker compose up -d
 2. Backend-Dependencies installieren:
 ```bash
 cd backend
+. .venv/bin/activate 2>/dev/null || true
 pip install -e .[dev]
 ```
 
@@ -25,7 +26,7 @@ alembic upgrade head
 ## Relevante ENV-Variablen (lokal)
 
 ```bash
-export DATABASE_URL='postgresql+psycopg://life_event:life_event@localhost:5432/life_event'
+export DATABASE_URL='postgresql+psycopg://life_event:life_event@127.0.0.1:5433/life_event'
 export CELERY_BROKER_URL='redis://localhost:6379/0'
 export CELERY_RESULT_BACKEND='redis://localhost:6379/0'
 export APP_BASE_URL='http://localhost:3000'
@@ -41,6 +42,10 @@ export EMAIL_FROM_NAME='Life Event'
 # optional fuer stabile Token-Signatur
 # export NOTIFICATION_TOKEN_SECRET='local-dev-secret'
 ```
+
+Wichtig:
+- `DATABASE_URL` muss in **einer Zeile** gesetzt werden (kein Zeilenumbruch in der URL).
+- Falls dein Postgres lokal auf `5432` gemappt ist, `5433` entsprechend auf `5432` anpassen.
 
 ## Test A: End-to-End mit manuellem Task-Trigger
 
@@ -134,6 +139,20 @@ PY
 
 Bei `EMAIL_DRY_RUN=true` sollte der Dispatch auf `sent` gehen, ohne echte Mail zu schicken.
 
+## Validiertes Beispielergebnis (Dry-Run)
+
+Ein erfolgreicher Lauf zeigt typischerweise:
+- `reminder_scan_due_soon_summary`: `outbox_created=1`
+- `dispatch_pending_outbox_summary`: `picked=1`, `sent=1`, `retried=0`, `dead=0`
+- Outbox-Datensatz:
+  - `status=sent`
+  - `attempt_count=0`
+  - `provider_message_id=dry-run`
+
+Ein zweiter Scan am selben Tag sollte keinen zweiten Reminder erzeugen:
+- `outbox_created=0`
+- `skipped_daily_cap=1`
+
 ## Test B: Scheduler (Beat) testen
 
 1. Worker laufen lassen.
@@ -152,3 +171,20 @@ celery -A app.worker.celery_app.celery_app beat --loglevel=info
 - Quiet Hours (`08:00..20:00` Berlin): außerhalb wird auf `pending` rescheduled (`QUIET_HOURS_DELAY`), ohne Attempt-Counter zu erhöhen.
 - Daily cap basiert auf gesendeten Remindern (`sent`) pro Profil/Tag.
 - Unsubscribe-Token bleibt stabil, bis gezielte Rotation durchgeführt wird.
+
+## Troubleshooting
+
+- Fehler `AttributeError: 'NoneType' object has no attribute 'Redis'` beim Worker:
+```bash
+cd backend
+. .venv/bin/activate
+pip install -e .[dev]
+python -c "import redis; print(redis.__version__)"
+```
+
+- Fehler `connection refused 127.0.0.1:5433`:
+```bash
+cd infra
+docker compose ps
+```
+Pruefen, auf welchem Host-Port Postgres gemappt ist (`5433` oder `5432`) und `DATABASE_URL` entsprechend setzen.
