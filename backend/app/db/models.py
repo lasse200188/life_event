@@ -158,7 +158,9 @@ class NotificationProfile(Base):
 class NotificationOutbox(Base):
     __tablename__ = "notification_outbox"
     __table_args__ = (
-        UniqueConstraint("dedupe_key_raw", name="uq_notification_outbox_dedupe_key_raw"),
+        UniqueConstraint(
+            "dedupe_key_raw", name="uq_notification_outbox_dedupe_key_raw"
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
@@ -184,7 +186,9 @@ class NotificationOutbox(Base):
     last_error_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
     last_error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     provider_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

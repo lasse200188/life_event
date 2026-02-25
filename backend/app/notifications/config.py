@@ -15,7 +15,6 @@ class NotificationConfig:
     allowed_recipient_domains: set[str]
 
 
-
 def load_notification_config() -> NotificationConfig:
     allowed_domains_raw = os.getenv("EMAIL_ALLOWED_RECIPIENT_DOMAINS", "")
     allowed_domains = {

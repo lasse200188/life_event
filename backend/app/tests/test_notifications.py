@@ -64,7 +64,9 @@ def _configure_profile(client: TestClient, plan_id: UUID) -> None:
     assert response.status_code == 200
 
 
-def test_scan_creates_outbox_for_due_tomorrow_and_is_idempotent(client: TestClient) -> None:
+def test_scan_creates_outbox_for_due_tomorrow_and_is_idempotent(
+    client: TestClient,
+) -> None:
     plan_id = _create_plan(client)
     _configure_profile(client, plan_id)
 
@@ -108,7 +110,11 @@ def test_scan_ignores_done_and_null_due_date(client: TestClient) -> None:
 
     with session_factory() as session:
         tasks = list(
-            session.scalars(select(Task).where(Task.plan_id == plan_id).order_by(Task.sort_key.asc())).all()
+            session.scalars(
+                select(Task)
+                .where(Task.plan_id == plan_id)
+                .order_by(Task.sort_key.asc())
+            ).all()
         )
         assert len(tasks) >= 2
         tasks[0].status = TaskStatus.done.value

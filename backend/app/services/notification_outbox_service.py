@@ -13,7 +13,11 @@ from app.db.models import (
     NotificationOutbox,
     NotificationOutboxStatus,
 )
-from app.notifications.time_utils import BERLIN_TZ, is_within_send_window, next_send_window_start
+from app.notifications.time_utils import (
+    BERLIN_TZ,
+    is_within_send_window,
+    next_send_window_start,
+)
 
 
 class NotificationOutboxService:

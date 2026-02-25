@@ -37,7 +37,9 @@ class NotificationProfileService:
         reminder_due_soon_enabled: bool,
     ) -> NotificationProfile:
         profile = self.get_or_create(session, plan_id=plan_id)
-        profile.email = email.strip() if isinstance(email, str) and email.strip() else None
+        profile.email = (
+            email.strip() if isinstance(email, str) and email.strip() else None
+        )
         profile.email_consent = email_consent
         profile.locale = locale
         profile.timezone = timezone
@@ -63,7 +65,9 @@ class NotificationProfileService:
             and profile.reminder_due_soon_enabled
         )
 
-    def issue_unsubscribe_token(self, session: Session, *, profile: NotificationProfile) -> str:
+    def issue_unsubscribe_token(
+        self, session: Session, *, profile: NotificationProfile
+    ) -> str:
         token = secrets.token_urlsafe(24)
         profile.unsubscribe_token_hash = self._hash_token(token)
         profile.updated_at = datetime.now(UTC)

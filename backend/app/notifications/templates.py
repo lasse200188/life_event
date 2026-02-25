@@ -45,11 +45,17 @@ def render_task_due_soon(payload: dict) -> RenderedEmail:
         grouped[bucket].append(task)
 
     total = len(tasks)
-    subject = "1 Aufgabe bald f\u00e4llig" if total == 1 else f"{total} Aufgaben bald f\u00e4llig"
+    subject = (
+        "1 Aufgabe bald f\u00e4llig"
+        if total == 1
+        else f"{total} Aufgaben bald f\u00e4llig"
+    )
 
     greeting_name = payload.get("user_display_name")
     greeting = (
-        f"Hallo {greeting_name}," if isinstance(greeting_name, str) and greeting_name else "Hallo,"
+        f"Hallo {greeting_name},"
+        if isinstance(greeting_name, str) and greeting_name
+        else "Hallo,"
     )
 
     lines = [greeting, "", "die folgenden Aufgaben stehen bald an:", ""]

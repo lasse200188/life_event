@@ -31,9 +31,13 @@ class OutboxDispatcherService:
         self.outbox_service = NotificationOutboxService()
         self.provider = BrevoEmailProvider(config)
 
-    def dispatch_pending(self, session: Session, *, now: datetime, batch_size: int = 100) -> DispatchSummary:
+    def dispatch_pending(
+        self, session: Session, *, now: datetime, batch_size: int = 100
+    ) -> DispatchSummary:
         recovered_stuck = self.outbox_service.recover_stuck_sending(session, now=now)
-        items = self.outbox_service.lock_pending_batch(session, now=now, limit=batch_size)
+        items = self.outbox_service.lock_pending_batch(
+            session, now=now, limit=batch_size
+        )
 
         picked = len(items)
         sent = 0

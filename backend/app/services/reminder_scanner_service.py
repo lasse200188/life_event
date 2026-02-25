@@ -31,7 +31,9 @@ class ReminderScannerService:
         self.profile_service = NotificationProfileService()
         self.outbox_service = NotificationOutboxService()
 
-    def scan_due_soon(self, session: Session, *, now: datetime, app_base_url: str) -> ScanSummary:
+    def scan_due_soon(
+        self, session: Session, *, now: datetime, app_base_url: str
+    ) -> ScanSummary:
         local_today = now.astimezone(BERLIN_TZ).date()
         local_end = local_today + timedelta(days=3)
 
@@ -97,12 +99,16 @@ class ReminderScannerService:
                             "title": task.title,
                             "due_date": task.due_date.isoformat(),
                             "due_in_days": (task.due_date - local_today).days,
-                            "category": task.metadata_json.get("category")
-                            if isinstance(task.metadata_json, dict)
-                            else None,
-                            "priority": task.metadata_json.get("priority")
-                            if isinstance(task.metadata_json, dict)
-                            else None,
+                            "category": (
+                                task.metadata_json.get("category")
+                                if isinstance(task.metadata_json, dict)
+                                else None
+                            ),
+                            "priority": (
+                                task.metadata_json.get("priority")
+                                if isinstance(task.metadata_json, dict)
+                                else None
+                            ),
                         }
                     )
 
