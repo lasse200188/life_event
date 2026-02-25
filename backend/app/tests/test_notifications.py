@@ -15,6 +15,7 @@ from app.db.session import configure_engine, get_engine, get_session_factory
 from app.main import app
 from app.notifications.config import NotificationConfig
 from app.notifications.templates import render_task_due_soon
+from app.services.notification_profile_service import NotificationProfileService
 from app.services.outbox_dispatcher_service import OutboxDispatcherService
 from app.services.reminder_scanner_service import ReminderScannerService
 
@@ -265,7 +266,8 @@ def test_quiet_hours_reschedule_does_not_increment_attempts(
         assert updated is not None
         assert updated.status == "pending"
         assert updated.attempt_count == 0
-        assert updated.last_error_code == "QUIET_HOURS"
+        assert updated.failure_class is None
+        assert updated.last_error_code == "QUIET_HOURS_DELAY"
 
 
 def test_consent_false_does_not_mark_unsubscribed(client: TestClient) -> None:
@@ -284,3 +286,31 @@ def test_consent_false_does_not_mark_unsubscribed(client: TestClient) -> None:
     body = response.json()
     assert body["sendable"] is False
     assert body["unsubscribed_at"] is None
+
+
+def test_rotate_unsubscribe_token_invalidates_previous_token(
+    client: TestClient,
+) -> None:
+    plan_id = _create_plan(client)
+    _configure_profile(client, plan_id)
+    session_factory = get_session_factory()
+    service = NotificationProfileService()
+
+    with session_factory() as session:
+        profile = session.scalar(
+            select(NotificationProfile).where(NotificationProfile.plan_id == plan_id)
+        )
+        assert profile is not None
+        first_token = service.issue_unsubscribe_token(session, profile=profile)
+        session.commit()
+        service.rotate_unsubscribe_token(session, profile=profile)
+        second_token = service.issue_unsubscribe_token(session, profile=profile)
+        session.commit()
+
+    assert first_token != second_token
+
+    with session_factory() as session:
+        first_result = service.unsubscribe_by_token(session, token=first_token)
+        second_result = service.unsubscribe_by_token(session, token=second_token)
+        assert first_result is False
+        assert second_result is True

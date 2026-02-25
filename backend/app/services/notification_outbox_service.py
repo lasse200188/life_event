@@ -191,9 +191,9 @@ class NotificationOutboxService:
             return
 
         item.status = NotificationOutboxStatus.pending.value
-        item.failure_class = NotificationFailureClass.retryable.value
-        item.last_error_code = "QUIET_HOURS"
-        item.last_error_message = "outside send window"
+        item.failure_class = None
+        item.last_error_code = "QUIET_HOURS_DELAY"
+        item.last_error_message = "Delayed due to quiet hours"
         item.next_attempt_at = next_send_window_start(now)
         item.updated_at = now
         session.add(item)

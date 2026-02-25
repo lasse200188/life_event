@@ -141,6 +141,7 @@ class NotificationProfile(Base):
         nullable=False, default=True
     )
     max_reminders_per_day: Mapped[int] = mapped_column(nullable=False, default=1)
+    unsubscribe_token_version: Mapped[int] = mapped_column(nullable=False, default=1)
     unsubscribed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

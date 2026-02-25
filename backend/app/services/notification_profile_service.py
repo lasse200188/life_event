@@ -70,13 +70,29 @@ class NotificationProfileService:
     def issue_unsubscribe_token(
         self, session: Session, *, profile: NotificationProfile
     ) -> str:
-        token = self._stable_unsubscribe_token(profile.id)
+        token = self._stable_unsubscribe_token(
+            profile.id, profile.unsubscribe_token_version
+        )
         token_hash = self._hash_token(token)
         if profile.unsubscribe_token_hash != token_hash:
             profile.unsubscribe_token_hash = token_hash
         profile.updated_at = datetime.now(UTC)
         session.add(profile)
         session.flush()
+        return token
+
+    def rotate_unsubscribe_token(
+        self, session: Session, *, profile: NotificationProfile
+    ) -> str:
+        profile.unsubscribe_token_version += 1
+        token = self._stable_unsubscribe_token(
+            profile.id, profile.unsubscribe_token_version
+        )
+        profile.unsubscribe_token_hash = self._hash_token(token)
+        profile.updated_at = datetime.now(UTC)
+        session.add(profile)
+        session.commit()
+        session.refresh(profile)
         return token
 
     def unsubscribe_by_token(self, session: Session, *, token: str) -> bool:
@@ -100,10 +116,11 @@ class NotificationProfileService:
     def _hash_token(self, token: str) -> str:
         return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
-    def _stable_unsubscribe_token(self, profile_id: UUID) -> str:
+    def _stable_unsubscribe_token(self, profile_id: UUID, version: int) -> str:
+        payload = f"{profile_id}:{version}"
         signature = hmac.new(
             self._token_secret.encode("utf-8"),
-            str(profile_id).encode("utf-8"),
+            payload.encode("utf-8"),
             hashlib.sha256,
         ).hexdigest()
-        return f"{profile_id}.{signature}"
+        return f"{profile_id}.{version}.{signature}"
