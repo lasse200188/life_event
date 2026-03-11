@@ -37,6 +37,35 @@ Das Projekt kombiniert:
 - `infra/`: Docker Compose fuer lokale Basisdienste
 - `docs/`: technische Projektdokumentation
 
+## Production Deployment (mylifeflow.app)
+
+Dieses Repo ist auf dem Host so integriert, dass es hinter Traefik unter
+`https://mylifeflow.app` laeuft:
+
+- Frontend: `https://mylifeflow.app/`
+- Backend: `https://mylifeflow.app/api/*` (Traefik `PathPrefix(/api)` + `stripPrefix`)
+- Worker/Beat: laufen als separate Services im gleichen Compose-Stack
+
+### Betriebsannahmen
+
+- Externes Docker-Netz: `srv_backend_net`
+- Zentrales PostgreSQL: `postgres` (Secrets aus Vault via `/srv/postgresql/runtime/life_event.env`)
+- Zentraler Redis: `redis` (Passwort aus `/srv/redis/runtime/redis_password`)
+- Traefik dynamic config: `/srv/traefik/dynamic/mylifeflow.yml`
+
+### Start / Update
+
+```bash
+cd /opt/mylifeflow
+docker compose up -d --build
+docker compose ps
+```
+
+### Worker/Beat Security
+
+Das Backend-Image laeuft als unprivilegierter User `app` (`uid/gid 10001`), daher laufen
+auch Celery Worker und Beat nicht als root.
+
 ## Quickstart
 
 ### 1) Infrastruktur

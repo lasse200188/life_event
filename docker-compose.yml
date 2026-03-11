@@ -1,0 +1,86 @@
+services:
+  mylifeflow-backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: mylifeflow-backend
+    restart: unless-stopped
+    env_file:
+      - path: ./.env
+      - path: /srv/postgresql/runtime/life_event.env
+    environment:
+      AUTO_CREATE_SCHEMA: "0"
+      APP_BASE_URL: "https://mylifeflow.app"
+      CORS_ORIGINS: "https://mylifeflow.app,https://www.mylifeflow.app"
+      EMAIL_DRY_RUN: "true"
+    command: >
+      sh -c "alembic upgrade head &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    networks:
+      - backend
+
+  mylifeflow-worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: mylifeflow-worker
+    restart: unless-stopped
+    env_file:
+      - path: ./.env
+      - path: /srv/postgresql/runtime/life_event.env
+    environment:
+      APP_BASE_URL: "https://mylifeflow.app"
+      EMAIL_DRY_RUN: "true"
+    volumes:
+      - /srv/redis/runtime/redis_password:/run/redis/redis_password:ro
+    command: >
+      sh -c 'REDIS_PASSWORD=$$(cat /run/redis/redis_password) &&
+             export CELERY_BROKER_URL="redis://:$$REDIS_PASSWORD@redis:6379/0" &&
+             export CELERY_RESULT_BACKEND="$$CELERY_BROKER_URL" &&
+             celery -A app.worker.celery_app.celery_app worker --loglevel=info'
+    depends_on:
+      - mylifeflow-backend
+    networks:
+      - backend
+
+  mylifeflow-beat:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: mylifeflow-beat
+    restart: unless-stopped
+    env_file:
+      - path: ./.env
+      - path: /srv/postgresql/runtime/life_event.env
+    environment:
+      APP_BASE_URL: "https://mylifeflow.app"
+      EMAIL_DRY_RUN: "true"
+    volumes:
+      - /srv/redis/runtime/redis_password:/run/redis/redis_password:ro
+    command: >
+      sh -c 'REDIS_PASSWORD=$$(cat /run/redis/redis_password) &&
+             export CELERY_BROKER_URL="redis://:$$REDIS_PASSWORD@redis:6379/0" &&
+             export CELERY_RESULT_BACKEND="$$CELERY_BROKER_URL" &&
+             celery -A app.worker.celery_app.celery_app beat --loglevel=info'
+    depends_on:
+      - mylifeflow-backend
+    networks:
+      - backend
+
+  mylifeflow-frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE_URL: "https://mylifeflow.app/api"
+    container_name: mylifeflow-frontend
+    restart: unless-stopped
+    depends_on:
+      - mylifeflow-backend
+    networks:
+      - backend
+
+networks:
+  backend:
+    external: true
+    name: srv_backend_net
