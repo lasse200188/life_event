@@ -1,6 +1,6 @@
 # Roadmap (Next)
 
-Dieses Dokument beschreibt die naechsten groesseren Schritte nach den bereits abgeschlossenen Milestones M1-M5.
+Dieses Dokument beschreibt die naechsten groesseren Schritte nach den bereits abgeschlossenen Milestones M1-M7.
 
 Fuer den bereits erreichten Stand siehe [docs/MILESTONES.md](docs/MILESTONES.md).
 
@@ -11,9 +11,9 @@ Fuer den bereits erreichten Stand siehe [docs/MILESTONES.md](docs/MILESTONES.md)
 - Trennung von Plans pro User
 - Zugriffsschutz fuer Plan-Endpunkte
 
-2. Recompute-Transparenz
-- Sichtbare Historie von Facts-Aenderungen
-- Nachvollziehbarkeit, welche Tasks durch Recompute hinzugekommen/entfallen sind
+2. Recompute-Historie im Frontend
+- Snapshot-Recompute-Delta in der UI sichtbar machen
+- Faktaenderungen und Task-Deltas nutzerfreundlich erklaeren
 
 3. Decision-Actions generalisieren
 - typed `ui_actions` statt task-spezifischer UI-Sonderlogik

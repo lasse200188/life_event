@@ -241,7 +241,8 @@ def test_patch_plan_facts_recompute_switches_child_insurance_and_keeps_done(
 
     tasks_after = client.get(f"/plans/{plan_id}/tasks").json()
     task_status_by_key = {item["task_key"]: item["status"] for item in tasks_after}
-    assert "t_decide_child_insurance" not in task_status_by_key
+    assert "t_decide_child_insurance" in task_status_by_key
+    assert task_status_by_key["t_decide_child_insurance"] == "skipped"
     assert "t_add_child_insurance_gkv" in task_status_by_key
     assert "t_add_child_insurance_pkv" not in task_status_by_key
     assert task_status_by_key["t_birth_certificate"] == "done"
@@ -298,3 +299,99 @@ def test_tasks_without_metadata_still_include_task_kind(client: TestClient) -> N
     tasks = tasks_response.json()
     assert any(item["task_kind"] == "decision" for item in tasks)
     assert all(item.get("metadata") is None for item in tasks)
+
+
+def test_recompute_soft_dismiss_and_reactivate_reuses_task_row(
+    client: TestClient,
+) -> None:
+    create_payload = {
+        "template_key": "birth_de/v2",
+        "facts": {
+            "birth_date": "2026-04-01",
+            "employment_type": "employed",
+            "public_insurance": True,
+            "private_insurance": False,
+        },
+    }
+    plan_id = client.post("/plans", json=create_payload).json()["id"]
+
+    before = client.get(f"/plans/{plan_id}/tasks").json()
+    leave_before = next(
+        item for item in before if item["task_key"] == "t_parental_leave_employer"
+    )
+
+    switch_off = client.patch(
+        f"/plans/{plan_id}/facts",
+        json={"facts": {"employment_type": "unemployed"}, "recompute": True},
+    )
+    assert switch_off.status_code == 200
+    after_off = client.get(f"/plans/{plan_id}/tasks").json()
+    leave_after_off = next(
+        item for item in after_off if item["task_key"] == "t_parental_leave_employer"
+    )
+    assert leave_after_off["id"] == leave_before["id"]
+    assert leave_after_off["status"] == "skipped"
+
+    switch_on = client.patch(
+        f"/plans/{plan_id}/facts",
+        json={"facts": {"employment_type": "employed"}, "recompute": True},
+    )
+    assert switch_on.status_code == 200
+    after_on = client.get(f"/plans/{plan_id}/tasks").json()
+    leave_after_on = next(
+        item for item in after_on if item["task_key"] == "t_parental_leave_employer"
+    )
+    assert leave_after_on["id"] == leave_before["id"]
+    assert leave_after_on["status"] == "todo"
+
+
+def test_fact_change_fast_path_uses_normalized_hash(client: TestClient) -> None:
+    create_payload = {
+        "template_key": "birth_de/v2",
+        "facts": {
+            "birth_date": "2026-04-01",
+            "employment_type": "employed",
+            "public_insurance": True,
+            "private_insurance": False,
+            "child_insurance_kind": "gkv",
+        },
+    }
+    plan_id = client.post("/plans", json=create_payload).json()["id"]
+    initial_snapshot = client.get(f"/plans/{plan_id}?include_snapshot=true").json()[
+        "snapshot"
+    ]
+    initial_hash = initial_snapshot["facts_hash"]
+
+    response = client.patch(
+        f"/plans/{plan_id}/facts",
+        json={"facts": {"child_insurance_kind": "invalid-value"}, "recompute": True},
+    )
+    assert response.status_code == 200
+    after_snapshot = client.get(f"/plans/{plan_id}?include_snapshot=true").json()[
+        "snapshot"
+    ]
+
+    assert after_snapshot["facts_hash"] == initial_hash
+    assert after_snapshot["recompute"]["reason"] == "FACT_CHANGE"
+    assert after_snapshot["recompute_delta"]["facts_diff"] == []
+
+
+def test_recompute_reason_query_is_persisted_in_snapshot(client: TestClient) -> None:
+    create_payload = {
+        "template_key": "birth_de/v1",
+        "facts": {
+            "birth_date": "2026-04-01",
+            "employment_type": "employed",
+            "public_insurance": True,
+            "private_insurance": False,
+        },
+    }
+    plan_id = client.post("/plans", json=create_payload).json()["id"]
+
+    recompute_response = client.post(
+        f"/plans/{plan_id}/recompute?reason=TEMPLATE_UPDATE"
+    )
+    assert recompute_response.status_code == 200
+
+    snapshot = client.get(f"/plans/{plan_id}?include_snapshot=true").json()["snapshot"]
+    assert snapshot["recompute"]["reason"] == "TEMPLATE_UPDATE"

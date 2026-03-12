@@ -107,6 +107,9 @@ class Task(Base):
         nullable=False,
         server_default=JSON_EMPTY_DEFAULT,
     )
+    task_template_version: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=1
+    )
     sort_key: Mapped[int] = mapped_column(Integer, nullable=False)
     completed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

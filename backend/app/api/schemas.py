@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from enum import Enum
 from typing import Any
 from typing import Literal
 from uuid import UUID
@@ -106,3 +107,9 @@ class NotificationProfileResponse(BaseModel):
 
 class NotificationUnsubscribeResponse(BaseModel):
     ok: bool = True
+
+
+class RecomputeReason(str, Enum):
+    FACT_CHANGE = "FACT_CHANGE"
+    TEMPLATE_UPDATE = "TEMPLATE_UPDATE"
+    MANUAL = "MANUAL"

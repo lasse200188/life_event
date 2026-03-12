@@ -10,6 +10,7 @@ Das Projekt kombiniert:
 ## Dokumentation
 
 - Produkt-/Umsetzungsstand je Milestone: [docs/MILESTONES.md](docs/MILESTONES.md)
+- Release-Notes: [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 - API-Referenz (aktueller Stand): [docs/API.md](docs/API.md)
 - Reminder/Scheduler Test-Guide: [docs/NOTIFICATIONS_TESTING.md](docs/NOTIFICATIONS_TESTING.md)
 - Naechste geplante Arbeiten: [ROADMAP.md](ROADMAP.md)
@@ -67,6 +68,20 @@ Das Backend-Image laeuft als unprivilegierter User `app` (`uid/gid 10001`), dahe
 auch Celery Worker und Beat nicht als root.
 
 ## Quickstart
+
+### Lokales CI-aehnliches Setup (empfohlen)
+
+Voraussetzungen:
+- `uv` installiert
+- `make` installiert
+
+```bash
+cd /opt/mylifeflow
+make setup
+make test
+```
+
+Das entspricht lokal dem ueblichen Backend-Pruefablauf (Workflow-Validation + beide pytest-Suiten).
 
 ### 1) Infrastruktur
 
@@ -148,12 +163,9 @@ celery -A app.worker.celery_app.celery_app call app.worker.tasks.dispatch_pendin
 ### Backend
 
 ```bash
-cd backend
-python -m app.tools.validate_all_workflows ../workflows
-python -m pytest -q -m workflow
-python -m pytest -q -m "not workflow"
-ruff check .
-black --check .
+cd /opt/mylifeflow
+make test
+make lint-backend
 ```
 
 ### Frontend

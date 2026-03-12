@@ -41,6 +41,15 @@ Antwort:
 - `snapshot_meta`
 - optional `snapshot`
 
+Bei `include_snapshot=true` enthaelt `snapshot` u. a.:
+- `template_version`
+- `fact_schema_version`
+- `facts_hash`
+- optional bei Recompute:
+  - `recompute.executed_at`
+  - `recompute.reason` (`MANUAL|FACT_CHANGE|TEMPLATE_UPDATE`)
+  - `recompute_delta` mit Task-/Fact-Aenderungen
+
 ### `PATCH /plans/{plan_id}/facts`
 
 Merged Facts-Update auf einem bestehenden Plan.
@@ -58,14 +67,20 @@ Request:
 Verhalten:
 - merged Facts werden gespeichert
 - bei `recompute=true` wird Plan neu berechnet
+- Recompute bei Facts-Update nutzt intern `reason=FACT_CHANGE`
 
 ### `POST /plans/{plan_id}/recompute`
 
 Fuehrt Recompute fuer aktuellen Facts-Stand aus.
 
+Query:
+- `reason` (`FACT_CHANGE|TEMPLATE_UPDATE|MANUAL`, default `MANUAL`)
+
 Verhalten:
-- aktive Tasks werden neu aufgebaut
-- bereits erledigte Tasks bleiben `done`, sofern weiterhin aktiv (Match per `task_key`)
+- aktive Tasks werden per Merge mit bestehenden Instanzen abgeglichen (`task_key`)
+- nicht mehr eligible Tasks werden auf `skipped` gesetzt (soft-dismiss), nicht geloescht
+- bereits erledigte Tasks bleiben `done`
+- Snapshot enthaelt Recompute-Metadaten (`reason`) und Delta
 
 ## Tasks
 
@@ -80,6 +95,9 @@ Antwort (pro Task):
 - `task_kind`: `normal | decision`
 - `status`, `due_date`, `sort_key`, Timestamps
 - optional `metadata`
+
+Hinweis:
+- Recompute kann Tasks auf `skipped` setzen (soft-dismiss), statt sie zu loeschen.
 
 `task_kind` wird serverseitig berechnet:
 - `decision`, wenn `metadata.tags` `decision` enthaelt oder `metadata.ui_actions` gesetzt ist

@@ -13,6 +13,7 @@ from app.api.schemas import (
     PlanCreateRequest,
     PlanCreateResponse,
     PlanResponse,
+    RecomputeReason,
     SnapshotMeta,
     TaskResponse,
     TaskStatusPatchRequest,
@@ -78,9 +79,10 @@ def patch_plan_facts(
 @router.post("/plans/{plan_id}/recompute", response_model=PlanResponse)
 def recompute_plan(
     plan_id: UUID,
+    reason: RecomputeReason = Query(RecomputeReason.MANUAL),
     session: Session = Depends(get_db_session),
 ) -> PlanResponse:
-    plan = PlanService().recompute_plan(session, plan_id=plan_id)
+    plan = PlanService().recompute_plan(session, plan_id=plan_id, reason=reason.value)
     return _serialize_plan(plan, include_snapshot=False)
 
 
