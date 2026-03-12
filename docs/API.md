@@ -20,13 +20,26 @@ Erzeugt einen neuen Plan aus Template + Facts.
 Request:
 ```json
 {
-  "template_key": "birth_de/v2",
+  "template_id": "birth_de",
   "facts": {
     "birth_date": "2026-04-01",
     "employment_type": "employed"
   }
 }
 ```
+
+Alternative (explizites Pinning):
+```json
+{
+  "template_key": "birth_de/v2",
+  "facts": {
+    "birth_date": "2026-04-01"
+  }
+}
+```
+
+Regel:
+- genau eins von `template_id` oder `template_key`
 
 Antwort: `201 Created`
 - `id`, `template_key`, `status`, `created_at`, `updated_at`, `links`
@@ -40,6 +53,8 @@ Antwort:
 - Plan-Grunddaten
 - `snapshot_meta`
 - optional `snapshot`
+- `template_id`, `template_version`
+- `latest_published_version`, `upgrade_available`
 
 Bei `include_snapshot=true` enthaelt `snapshot` u. a.:
 - `template_version`
@@ -81,6 +96,35 @@ Verhalten:
 - nicht mehr eligible Tasks werden auf `skipped` gesetzt (soft-dismiss), nicht geloescht
 - bereits erledigte Tasks bleiben `done`
 - Snapshot enthaelt Recompute-Metadaten (`reason`) und Delta
+
+### `POST /plans/{plan_id}/upgrade`
+
+Erzeugt neue Plan-Instanz aus der neuesten veroeffentlichten Version derselben `template_id`.
+
+Verhalten:
+- nutzt Facts des bestehenden Plans
+- keine Task-Status-Uebernahme
+- bei bereits neuester Version: `409 NO_UPGRADE_AVAILABLE`
+
+## Templates
+
+### `GET /templates`
+
+Listet bekannte Template-IDs inkl. `latest_published_version`.
+
+### `GET /templates/{template_id}/versions`
+
+Listet Versionen mit:
+- `version`, `status`, `template_key`, `published_at`, `deprecated_at`
+- `is_latest_published`
+
+### `POST /templates/{template_id}/versions/{version}/publish`
+
+Publish-Flow:
+- `draft -> published`
+- `published -> published` idempotent
+- `published -> draft` nicht erlaubt
+- Publish validiert Workflow-Datei + Integritaet
 
 ## Tasks
 
@@ -131,6 +175,10 @@ Alle Domain-Fehler folgen:
 
 Typische Codes:
 - `TEMPLATE_NOT_FOUND`
+- `INVALID_TEMPLATE_SELECTOR`
+- `NO_PUBLISHED_TEMPLATE`
+- `NO_UPGRADE_AVAILABLE`
+- `TEMPLATE_INTEGRITY_ERROR`
 - `PLAN_NOT_FOUND`
 - `TASK_NOT_FOUND`
 - `TASK_BLOCKED`

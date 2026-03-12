@@ -9,9 +9,11 @@ from fastapi.responses import JSONResponse
 
 from app.api.notifications import router as notifications_router
 from app.api.plans import router as plans_router
+from app.api.templates import router as templates_router
 from app.db.base import Base
-from app.db.session import get_engine
+from app.db.session import get_engine, get_session_factory
 from app.services.errors import ApiError
+from app.services.template_catalog_service import TemplateCatalogService
 
 
 def create_app() -> FastAPI:
@@ -59,12 +61,15 @@ def create_app() -> FastAPI:
         )
         if should_create:
             Base.metadata.create_all(bind=get_engine())
+            with get_session_factory()() as session:
+                TemplateCatalogService().bootstrap_defaults(session)
 
     @app.get("/health", tags=["system"])
     def health() -> dict[str, str]:
         return {"status": "ok"}
 
     app.include_router(plans_router)
+    app.include_router(templates_router)
     app.include_router(notifications_router)
     return app
 

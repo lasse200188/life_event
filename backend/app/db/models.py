@@ -70,7 +70,12 @@ class Plan(Base):
     __tablename__ = "plans"
 
     id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    template_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    template_version: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     template_key: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    upgraded_from_plan_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("plans.id", ondelete="SET NULL"), nullable=True
+    )
     facts: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE, nullable=False)
     snapshot: Mapped[dict[str, Any]] = mapped_column(JSON_TYPE, nullable=False)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -201,3 +206,33 @@ class NotificationOutbox(Base):
     )
 
     profile: Mapped[NotificationProfile] = relationship()
+
+
+class TemplateVersion(Base):
+    __tablename__ = "template_versions"
+    __table_args__ = (
+        UniqueConstraint(
+            "template_id", "version", name="uq_template_versions_id_version"
+        ),
+        UniqueConstraint("template_key", name="uq_template_versions_key"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    template_id: Mapped[str] = mapped_column(Text, nullable=False, index=True)
+    version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
+    template_key: Mapped[str] = mapped_column(Text, nullable=False)
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    compiled_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    changelog_md: Mapped[str | None] = mapped_column(Text, nullable=True)
+    deprecated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now()
+    )

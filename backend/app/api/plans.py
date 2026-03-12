@@ -31,14 +31,18 @@ def create_plan(
     payload: PlanCreateRequest,
     session: Session = Depends(get_db_session),
 ) -> PlanCreateResponse:
-    plan = PlanService().create_plan(
+    service = PlanService()
+    plan = service.create_plan(
         session,
+        template_id=payload.template_id,
         template_key=payload.template_key,
         facts=payload.facts,
     )
 
     return PlanCreateResponse(
         id=plan.id,
+        template_id=plan.template_id,
+        template_version=plan.template_version,
         template_key=plan.template_key,
         status=plan.status,
         created_at=plan.created_at,
@@ -56,9 +60,16 @@ def get_plan(
     include_snapshot: bool = Query(False),
     session: Session = Depends(get_db_session),
 ) -> PlanResponse:
-    plan = PlanService().get_plan(session, plan_id)
+    service = PlanService()
+    plan = service.get_plan(session, plan_id)
 
-    return _serialize_plan(plan, include_snapshot=include_snapshot)
+    return _serialize_plan(
+        plan,
+        include_snapshot=include_snapshot,
+        latest_published_version=service.latest_published_version(
+            session, template_id=plan.template_id
+        ),
+    )
 
 
 @router.patch("/plans/{plan_id}/facts", response_model=PlanResponse)
@@ -67,13 +78,20 @@ def patch_plan_facts(
     payload: PlanFactsPatchRequest,
     session: Session = Depends(get_db_session),
 ) -> PlanResponse:
-    plan = PlanService().update_facts(
+    service = PlanService()
+    plan = service.update_facts(
         session,
         plan_id=plan_id,
         facts_patch=payload.facts,
         recompute=payload.recompute,
     )
-    return _serialize_plan(plan, include_snapshot=False)
+    return _serialize_plan(
+        plan,
+        include_snapshot=False,
+        latest_published_version=service.latest_published_version(
+            session, template_id=plan.template_id
+        ),
+    )
 
 
 @router.post("/plans/{plan_id}/recompute", response_model=PlanResponse)
@@ -82,8 +100,38 @@ def recompute_plan(
     reason: RecomputeReason = Query(RecomputeReason.MANUAL),
     session: Session = Depends(get_db_session),
 ) -> PlanResponse:
-    plan = PlanService().recompute_plan(session, plan_id=plan_id, reason=reason.value)
-    return _serialize_plan(plan, include_snapshot=False)
+    service = PlanService()
+    plan = service.recompute_plan(session, plan_id=plan_id, reason=reason.value)
+    return _serialize_plan(
+        plan,
+        include_snapshot=False,
+        latest_published_version=service.latest_published_version(
+            session, template_id=plan.template_id
+        ),
+    )
+
+
+@router.post(
+    "/plans/{plan_id}/upgrade", response_model=PlanCreateResponse, status_code=201
+)
+def upgrade_plan(
+    plan_id: UUID,
+    session: Session = Depends(get_db_session),
+) -> PlanCreateResponse:
+    plan = PlanService().upgrade_plan(session, plan_id=plan_id)
+    return PlanCreateResponse(
+        id=plan.id,
+        template_id=plan.template_id,
+        template_version=plan.template_version,
+        template_key=plan.template_key,
+        status=plan.status,
+        created_at=plan.created_at,
+        updated_at=plan.updated_at,
+        links=PlanCreateLinks(
+            self=f"/plans/{plan.id}",
+            tasks=f"/plans/{plan.id}/tasks",
+        ),
+    )
 
 
 @router.get("/plans/{plan_id}/tasks", response_model=list[TaskResponse])
@@ -135,7 +183,12 @@ def _serialize_task(task: Any, *, include_metadata: bool) -> TaskResponse:
     )
 
 
-def _serialize_plan(plan: Any, *, include_snapshot: bool) -> PlanResponse:
+def _serialize_plan(
+    plan: Any,
+    *,
+    include_snapshot: bool,
+    latest_published_version: int | None,
+) -> PlanResponse:
     snapshot = plan.snapshot if isinstance(plan.snapshot, dict) else {}
     snapshot_meta = SnapshotMeta(
         generated_at=snapshot.get("generated_at"),
@@ -150,11 +203,18 @@ def _serialize_plan(plan: Any, *, include_snapshot: bool) -> PlanResponse:
 
     return PlanResponse(
         id=plan.id,
+        template_id=plan.template_id,
+        template_version=plan.template_version,
         template_key=plan.template_key,
         facts=plan.facts,
         status=plan.status,
         created_at=plan.created_at,
         updated_at=plan.updated_at,
+        latest_published_version=latest_published_version,
+        upgrade_available=(
+            isinstance(latest_published_version, int)
+            and latest_published_version > plan.template_version
+        ),
         snapshot_meta=snapshot_meta,
         snapshot=snapshot if include_snapshot else None,
     )

@@ -4,10 +4,14 @@ from pathlib import Path
 
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
 from app.db.base import Base
+from app.db.models import TemplateVersion
+from app.db.session import get_session_factory
 from app.db.session import configure_engine, get_engine
 from app.main import app
+from app.tests.support.template_seed import seed_published_templates
 
 
 @pytest.fixture()
@@ -17,6 +21,9 @@ def client(tmp_path: Path) -> TestClient:
     engine = get_engine()
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        seed_published_templates(session)
 
     with TestClient(app) as test_client:
         yield test_client
@@ -39,11 +46,15 @@ def test_plans_end_to_end_happy_path(client: TestClient) -> None:
     assert create_response.status_code == 201
     body = create_response.json()
     plan_id = body["id"]
+    assert body["template_id"] == "birth_de"
+    assert body["template_version"] == 1
 
     plan_response = client.get(f"/plans/{plan_id}")
     assert plan_response.status_code == 200
     plan_body = plan_response.json()
     assert plan_body["id"] == plan_id
+    assert plan_body["template_id"] == "birth_de"
+    assert plan_body["template_version"] == 1
     assert plan_body["status"] == "active"
     assert plan_body["facts"]["birth_date"] == "2026-04-01"
     assert plan_body["snapshot"] is None
@@ -92,6 +103,102 @@ def test_create_plan_unknown_template_returns_404(client: TestClient) -> None:
         json={"template_key": "birth_de/v999", "facts": {"birth_date": "2026-04-01"}},
     )
 
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "TEMPLATE_NOT_FOUND"
+
+
+def test_create_plan_selector_validation_rejects_none_or_both(
+    client: TestClient,
+) -> None:
+    none_selected = client.post(
+        "/plans",
+        json={"facts": {"birth_date": "2026-04-01"}},
+    )
+    assert none_selected.status_code == 400
+    assert none_selected.json()["error"]["code"] == "INVALID_TEMPLATE_SELECTOR"
+
+    both_selected = client.post(
+        "/plans",
+        json={
+            "template_id": "birth_de",
+            "template_key": "birth_de/v1",
+            "facts": {"birth_date": "2026-04-01"},
+        },
+    )
+    assert both_selected.status_code == 400
+    assert both_selected.json()["error"]["code"] == "INVALID_TEMPLATE_SELECTOR"
+
+
+def test_create_plan_with_template_id_uses_latest_published(client: TestClient) -> None:
+    response = client.post(
+        "/plans",
+        json={
+            "template_id": "birth_de",
+            "facts": {"birth_date": "2026-04-01"},
+        },
+    )
+    assert response.status_code == 201
+    body = response.json()
+    assert body["template_key"] == "birth_de/v2"
+    assert body["template_version"] == 2
+
+
+def test_templates_api_lists_templates_and_versions(client: TestClient) -> None:
+    templates_response = client.get("/templates")
+    assert templates_response.status_code == 200
+    templates = templates_response.json()
+    assert any(
+        item["template_id"] == "birth_de" and item["latest_published_version"] == 2
+        for item in templates
+    )
+
+    versions_response = client.get("/templates/birth_de/versions")
+    assert versions_response.status_code == 200
+    versions = versions_response.json()
+    assert [item["version"] for item in versions] == [1, 2]
+    assert versions[0]["is_latest_published"] is False
+    assert versions[1]["is_latest_published"] is True
+
+
+def test_publish_flow_draft_to_published_and_idempotent(client: TestClient) -> None:
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        row = session.scalar(
+            select(TemplateVersion).where(
+                TemplateVersion.template_id == "birth_de",
+                TemplateVersion.version == 2,
+            )
+        )
+        assert row is not None
+        row.status = "draft"
+        row.published_at = None
+        row.compiled_hash = None
+        session.add(row)
+        session.commit()
+
+    publish_response = client.post("/templates/birth_de/versions/2/publish")
+    assert publish_response.status_code == 200
+    assert publish_response.json()["status"] == "published"
+
+    publish_again = client.post("/templates/birth_de/versions/2/publish")
+    assert publish_again.status_code == 200
+    assert publish_again.json()["status"] == "published"
+
+
+def test_publish_fails_when_workflow_file_missing(client: TestClient) -> None:
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        session.add(
+            TemplateVersion(
+                template_id="birth_de",
+                version=999,
+                status="draft",
+                template_key="birth_de/v999",
+            )
+        )
+        session.commit()
+
+    response = client.post("/templates/birth_de/versions/999/publish")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "TEMPLATE_NOT_FOUND"
 
@@ -395,3 +502,52 @@ def test_recompute_reason_query_is_persisted_in_snapshot(client: TestClient) -> 
 
     snapshot = client.get(f"/plans/{plan_id}?include_snapshot=true").json()["snapshot"]
     assert snapshot["recompute"]["reason"] == "TEMPLATE_UPDATE"
+
+
+def test_upgrade_creates_new_plan_instance(client: TestClient) -> None:
+    create_payload = {
+        "template_key": "birth_de/v1",
+        "facts": {
+            "birth_date": "2026-04-01",
+            "employment_type": "employed",
+            "public_insurance": True,
+            "private_insurance": False,
+        },
+    }
+    source = client.post("/plans", json=create_payload)
+    assert source.status_code == 201
+    source_plan = source.json()
+
+    source_read = client.get(f"/plans/{source_plan['id']}")
+    assert source_read.status_code == 200
+    source_body = source_read.json()
+    assert source_body["upgrade_available"] is True
+    assert source_body["latest_published_version"] == 2
+
+    upgrade = client.post(f"/plans/{source_plan['id']}/upgrade")
+    assert upgrade.status_code == 201
+    upgraded = upgrade.json()
+    assert upgraded["id"] != source_plan["id"]
+    assert upgraded["template_key"] == "birth_de/v2"
+    assert upgraded["template_version"] == 2
+
+
+def test_upgrade_returns_no_upgrade_available_when_already_latest(
+    client: TestClient,
+) -> None:
+    create_payload = {
+        "template_key": "birth_de/v2",
+        "facts": {
+            "birth_date": "2026-04-01",
+            "employment_type": "employed",
+            "public_insurance": True,
+            "private_insurance": False,
+        },
+    }
+    source = client.post("/plans", json=create_payload)
+    assert source.status_code == 201
+    source_plan = source.json()
+
+    upgrade = client.post(f"/plans/{source_plan['id']}/upgrade")
+    assert upgrade.status_code == 409
+    assert upgrade.json()["error"]["code"] == "NO_UPGRADE_AVAILABLE"

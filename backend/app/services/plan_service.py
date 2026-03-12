@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.db.models import Plan, PlanStatus, Task, TaskStatus
+from app.db.models import Plan, PlanStatus, Task, TaskStatus, TemplateVersion
 from app.planner.engine import generate_plan
 from app.planner.errors import (
     PlannerDependencyError,
@@ -22,6 +22,7 @@ from app.services.facts_normalizer import (
     migrate_facts_to_latest_schema,
     normalize_facts,
 )
+from app.services.template_catalog_service import TemplateCatalogService
 from app.services.template_repository import TemplateRepository
 
 ENGINE_VERSION = "0.2.0"
@@ -36,16 +37,43 @@ OPEN_TASK_STATUSES = {
 
 
 class PlanService:
-    def __init__(self, template_repository: TemplateRepository | None = None) -> None:
+    def __init__(
+        self,
+        template_repository: TemplateRepository | None = None,
+        template_catalog_service: TemplateCatalogService | None = None,
+    ) -> None:
         self.template_repository = template_repository or TemplateRepository()
+        self.template_catalog_service = (
+            template_catalog_service or TemplateCatalogService(self.template_repository)
+        )
 
     def create_plan(
-        self, session: Session, *, template_key: str, facts: dict[str, Any]
+        self,
+        session: Session,
+        *,
+        template_id: str | None = None,
+        template_key: str | None = None,
+        facts: dict[str, Any],
+        upgraded_from_plan_id: UUID | None = None,
     ) -> Plan:
         try:
-            template = self.template_repository.load(template_key)
-            normalized_facts, schema_from, schema_to = self._prepare_facts(
+            (
+                resolved_template_id,
+                resolved_template_version,
+                resolved_template_key,
+                expected_compiled_hash,
+            ) = self._resolve_template_selector(
+                session,
+                template_id=template_id,
                 template_key=template_key,
+            )
+            template = self.template_repository.load_by_id_version(
+                resolved_template_id,
+                resolved_template_version,
+                expected_compiled_hash=expected_compiled_hash,
+            )
+            normalized_facts, schema_from, schema_to = self._prepare_facts(
+                template_key=resolved_template_key,
                 template=template,
                 input_facts=facts,
                 source_schema_version=None,
@@ -68,7 +96,7 @@ class PlanService:
         now = datetime.now(UTC)
         facts_hash = _hash_facts(normalized_facts)
         snapshot = self._build_snapshot(
-            template_key=template_key,
+            template_key=resolved_template_key,
             template=template,
             planner_plan=planner_plan,
             generated_at=now,
@@ -80,36 +108,37 @@ class PlanService:
         )
 
         try:
-            with session.begin():
-                plan = Plan(
-                    template_key=template_key,
-                    facts=normalized_facts,
-                    snapshot=snapshot,
-                    status=PlanStatus.active.value,
+            plan = Plan(
+                template_id=resolved_template_id,
+                template_version=resolved_template_version,
+                template_key=resolved_template_key,
+                upgraded_from_plan_id=upgraded_from_plan_id,
+                facts=normalized_facts,
+                snapshot=snapshot,
+                status=PlanStatus.active.value,
+            )
+            session.add(plan)
+            session.flush()
+
+            for idx, item in enumerate(planner_plan["tasks"]):
+                template_task = _read_template_task(template, item["id"])
+                due_date = _read_due_date(item.get("deadline"))
+                metadata = _build_task_metadata(item=item, template_task=template_task)
+
+                task = Task(
+                    plan_id=plan.id,
+                    task_key=item["id"],
+                    title=item["title"],
+                    description=None,
+                    status=TaskStatus.todo.value,
+                    due_date=due_date,
+                    metadata_json=metadata,
+                    task_template_version=_read_template_version(template),
+                    sort_key=idx,
                 )
-                session.add(plan)
-                session.flush()
+                session.add(task)
 
-                for idx, item in enumerate(planner_plan["tasks"]):
-                    template_task = _read_template_task(template, item["id"])
-                    due_date = _read_due_date(item.get("deadline"))
-                    metadata = _build_task_metadata(
-                        item=item, template_task=template_task
-                    )
-
-                    task = Task(
-                        plan_id=plan.id,
-                        task_key=item["id"],
-                        title=item["title"],
-                        description=None,
-                        status=TaskStatus.todo.value,
-                        due_date=due_date,
-                        metadata_json=metadata,
-                        task_template_version=_read_template_version(template),
-                        sort_key=idx,
-                    )
-                    session.add(task)
-
+            session.commit()
             session.refresh(plan)
             return plan
         except ApiError:
@@ -142,7 +171,7 @@ class PlanService:
                 facts_override=merged_facts,
             )
 
-        template = self.template_repository.load(plan.template_key)
+        template = self._load_template_for_plan(session, plan)
         snapshot = plan.snapshot if isinstance(plan.snapshot, dict) else {}
         source_schema_version = _read_snapshot_fact_schema_version(snapshot)
         normalized_facts, _, _ = self._prepare_facts(
@@ -170,7 +199,7 @@ class PlanService:
         plan = self.get_plan(session, plan_id)
         template_key = plan.template_key
         snapshot_before = plan.snapshot if isinstance(plan.snapshot, dict) else {}
-        template = self.template_repository.load(template_key)
+        template = self._load_template_for_plan(session, plan)
 
         input_facts = (
             dict(facts_override)
@@ -440,6 +469,33 @@ class PlanService:
             )
         return plan
 
+    def upgrade_plan(self, session: Session, *, plan_id: UUID) -> Plan:
+        source_plan = self.get_plan(session, plan_id)
+        source_template_id = source_plan.template_id
+        source_template_version = source_plan.template_version
+        latest_published = self.template_catalog_service.resolve_latest_published(
+            session, template_id=source_template_id
+        )
+        if latest_published.version == source_template_version:
+            raise ApiError(
+                status_code=409,
+                code="NO_UPGRADE_AVAILABLE",
+                message=(
+                    f"Plan '{plan_id}' already uses latest published version "
+                    f"{source_template_id}/v{source_template_version}"
+                ),
+            )
+
+        source_facts = (
+            dict(source_plan.facts) if isinstance(source_plan.facts, dict) else {}
+        )
+        return self.create_plan(
+            session,
+            template_key=latest_published.template_key,
+            facts=source_facts,
+            upgraded_from_plan_id=source_plan.id,
+        )
+
     def _prepare_facts(
         self,
         *,
@@ -455,6 +511,83 @@ class PlanService:
         )
         normalized_facts = normalize_facts(template_key, migrated_facts)
         return normalized_facts, schema_from, schema_to
+
+    def _resolve_template_selector(
+        self,
+        session: Session,
+        *,
+        template_id: str | None,
+        template_key: str | None,
+    ) -> tuple[str, int, str, str | None]:
+        has_template_id = isinstance(template_id, str) and bool(template_id)
+        has_template_key = isinstance(template_key, str) and bool(template_key)
+        if has_template_id == has_template_key:
+            raise ApiError(
+                status_code=400,
+                code="INVALID_TEMPLATE_SELECTOR",
+                message="Exactly one of 'template_id' or 'template_key' must be provided",
+            )
+
+        if has_template_id:
+            resolved = self.template_catalog_service.resolve_latest_published(
+                session, template_id=template_id
+            )
+            return (
+                resolved.template_id,
+                resolved.version,
+                resolved.template_key,
+                resolved.compiled_hash,
+            )
+
+        assert template_key is not None
+        try:
+            resolved = self.template_catalog_service.resolve_published_by_key(
+                session, template_key=template_key
+            )
+            return (
+                resolved.template_id,
+                resolved.version,
+                resolved.template_key,
+                resolved.compiled_hash,
+            )
+        except ApiError as exc:
+            if exc.code != "TEMPLATE_NOT_FOUND":
+                raise
+
+            parsed_template_id, parsed_template_version = (
+                self.template_repository.parse_template_key(template_key)
+            )
+            return (
+                parsed_template_id,
+                parsed_template_version,
+                template_key,
+                None,
+            )
+
+    def _load_template_for_plan(
+        self,
+        session: Session,
+        plan: Plan,
+    ) -> dict[str, Any]:
+        row = session.scalar(
+            select(TemplateVersion).where(
+                TemplateVersion.template_key == plan.template_key
+            )
+        )
+        expected_compiled_hash = row.compiled_hash if row is not None else None
+        return self.template_repository.load(
+            plan.template_key, expected_compiled_hash=expected_compiled_hash
+        )
+
+    def latest_published_version(
+        self,
+        session: Session,
+        *,
+        template_id: str,
+    ) -> int | None:
+        return self.template_catalog_service.get_latest_published_version(
+            session, template_id=template_id
+        )
 
     def _build_snapshot(
         self,

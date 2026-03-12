@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
-import { getPlan, getPlanTasks, type TaskResponse } from "@/lib/api";
+import { getPlan, getPlanTasks, upgradePlan, type TaskResponse } from "@/lib/api";
 import {
   computeProgress,
   hasCriticalTag,
@@ -19,8 +20,12 @@ type PlanPageProps = {
 };
 
 export default function PlanDashboardPage({ params }: PlanPageProps) {
+  const router = useRouter();
   const [tasks, setTasks] = useState<TaskResponse[]>([]);
   const [planStatus, setPlanStatus] = useState<string>("active");
+  const [templateKey, setTemplateKey] = useState<string>("");
+  const [upgradeAvailable, setUpgradeAvailable] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +41,8 @@ export default function PlanDashboardPage({ params }: PlanPageProps) {
           return;
         }
         setPlanStatus(plan.status);
+        setTemplateKey(plan.template_key);
+        setUpgradeAvailable(plan.upgrade_available);
         setTasks(fetchedTasks);
       } catch (loadError) {
         if (!mounted) {
@@ -67,6 +74,19 @@ export default function PlanDashboardPage({ params }: PlanPageProps) {
     [sortedTasks],
   );
 
+  async function onUpgrade() {
+    setIsUpgrading(true);
+    setError(null);
+    try {
+      const upgraded = await upgradePlan(params.id);
+      router.push(`/app/plan/${upgraded.id}`);
+    } catch (upgradeError) {
+      setError(upgradeError instanceof Error ? upgradeError.message : "Upgrade fehlgeschlagen");
+    } finally {
+      setIsUpgrading(false);
+    }
+  }
+
   if (loading) {
     return (
       <main>
@@ -90,8 +110,16 @@ export default function PlanDashboardPage({ params }: PlanPageProps) {
     <main>
       <h1>Plan Dashboard</h1>
       <p style={{ marginTop: 0, color: "#5b665f" }}>
-        Plan-ID: <code>{params.id}</code> | Status: <strong>{planStatus}</strong>
+        Plan-ID: <code>{params.id}</code> | Status: <strong>{planStatus}</strong> | Template:{" "}
+        <strong>{templateKey}</strong>
       </p>
+      {upgradeAvailable ? (
+        <p>
+          <button className="button button-ghost" disabled={isUpgrading} onClick={() => void onUpgrade()} type="button">
+            {isUpgrading ? "Upgrade laeuft ..." : "Upgrade Plan"}
+          </button>
+        </p>
+      ) : null}
 
       <section className="card" style={{ marginBottom: "1rem" }}>
         <h2 style={{ marginTop: 0 }}>Fortschritt: {progress}%</h2>

@@ -45,7 +45,7 @@ export default function OnboardingPage() {
 
     try {
       const result = await createPlan({
-        template_key: "birth_de/v2",
+        template_id: "birth_de",
         facts,
       });
       router.push(`/app/plan/${result.id}`);

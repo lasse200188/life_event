@@ -12,7 +12,8 @@ from app.db.models import TaskStatus
 
 
 class PlanCreateRequest(BaseModel):
-    template_key: str
+    template_id: str | None = None
+    template_key: str | None = None
     facts: dict[str, Any]
 
 
@@ -28,6 +29,8 @@ class PlanCreateLinks(BaseModel):
 
 class PlanCreateResponse(BaseModel):
     id: UUID
+    template_id: str
+    template_version: int
     template_key: str
     status: str
     created_at: datetime
@@ -45,12 +48,16 @@ class SnapshotMeta(BaseModel):
 class PlanResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    template_id: str
+    template_version: int
     id: UUID
     template_key: str
     facts: dict[str, Any]
     status: str
     created_at: datetime
     updated_at: datetime
+    latest_published_version: int | None = None
+    upgrade_available: bool = False
     snapshot_meta: SnapshotMeta
     snapshot: dict[str, Any] | None = None
 
@@ -113,3 +120,19 @@ class RecomputeReason(str, Enum):
     FACT_CHANGE = "FACT_CHANGE"
     TEMPLATE_UPDATE = "TEMPLATE_UPDATE"
     MANUAL = "MANUAL"
+
+
+class TemplateSummaryResponse(BaseModel):
+    template_id: str
+    latest_published_version: int | None
+    version_count: int
+
+
+class TemplateVersionResponse(BaseModel):
+    template_id: str
+    version: int
+    status: str
+    template_key: str
+    published_at: datetime | None
+    deprecated_at: datetime | None
+    is_latest_published: bool

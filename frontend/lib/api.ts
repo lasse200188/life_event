@@ -1,10 +1,13 @@
 export type PlanCreateRequest = {
-  template_key: string;
+  template_id?: string;
+  template_key?: string;
   facts: Record<string, unknown>;
 };
 
 export type PlanCreateResponse = {
   id: string;
+  template_id: string;
+  template_version: number;
   template_key: string;
   status: string;
   created_at: string;
@@ -17,11 +20,15 @@ export type PlanCreateResponse = {
 
 export type PlanResponse = {
   id: string;
+  template_id: string;
+  template_version: number;
   template_key: string;
   facts: Record<string, unknown>;
   status: string;
   created_at: string;
   updated_at: string;
+  latest_published_version: number | null;
+  upgrade_available: boolean;
   snapshot_meta: {
     generated_at: string | null;
     task_count: number | null;
@@ -39,7 +46,7 @@ export type PlanResponse = {
   } | null;
 };
 
-export type TaskStatus = "todo" | "done" | "dismissed";
+export type TaskStatus = "todo" | "in_progress" | "done" | "blocked" | "skipped";
 
 export type TaskResponse = {
   id: string;
@@ -67,6 +74,22 @@ type ApiError = {
     code?: string;
     message?: string;
   };
+};
+
+export type TemplateSummaryResponse = {
+  template_id: string;
+  latest_published_version: number | null;
+  version_count: number;
+};
+
+export type TemplateVersionResponse = {
+  template_id: string;
+  version: number;
+  status: string;
+  template_key: string;
+  published_at: string | null;
+  deprecated_at: string | null;
+  is_latest_published: boolean;
 };
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
@@ -151,6 +174,24 @@ export async function patchPlanFacts(
 
 export async function recomputePlan(planId: string): Promise<PlanResponse> {
   return apiRequest<PlanResponse>(`/plans/${planId}/recompute`, {
+    method: "POST",
+  });
+}
+
+export async function getTemplates(): Promise<TemplateSummaryResponse[]> {
+  return apiRequest<TemplateSummaryResponse[]>("/templates", {
+    method: "GET",
+  });
+}
+
+export async function getTemplateVersions(templateId: string): Promise<TemplateVersionResponse[]> {
+  return apiRequest<TemplateVersionResponse[]>(`/templates/${templateId}/versions`, {
+    method: "GET",
+  });
+}
+
+export async function upgradePlan(planId: string): Promise<PlanCreateResponse> {
+  return apiRequest<PlanCreateResponse>(`/plans/${planId}/upgrade`, {
     method: "POST",
   });
 }

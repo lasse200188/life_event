@@ -18,6 +18,7 @@ from app.notifications.templates import render_task_due_soon
 from app.services.notification_profile_service import NotificationProfileService
 from app.services.outbox_dispatcher_service import OutboxDispatcherService
 from app.services.reminder_scanner_service import ReminderScannerService
+from app.tests.support.template_seed import seed_published_templates
 
 BERLIN_TZ = ZoneInfo("Europe/Berlin")
 
@@ -29,6 +30,9 @@ def client(tmp_path: Path) -> TestClient:
     engine = get_engine()
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        seed_published_templates(session)
 
     with TestClient(app) as test_client:
         yield test_client
